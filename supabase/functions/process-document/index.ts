@@ -125,6 +125,7 @@ serve(async (req) => {
     // Call external webhook with proper headers
     const webhookHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
     }
 
     if (webhookAuthHeader) {

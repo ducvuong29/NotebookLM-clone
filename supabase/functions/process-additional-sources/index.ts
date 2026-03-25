@@ -118,6 +118,7 @@ serve(async (req) => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': authToken,
+        'ngrok-skip-browser-warning': 'true',
         ...corsHeaders
       },
       body: JSON.stringify(webhookPayload)

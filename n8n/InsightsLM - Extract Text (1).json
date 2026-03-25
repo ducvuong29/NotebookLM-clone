@@ -14,16 +14,16 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        60,
-        180
+        1632,
+        2048
       ],
-      "id": "92f1772c-8782-4c8d-9374-18b599a89655",
+      "id": "cf0b1aa8-82ad-472c-862c-de6ec0345016",
       "name": "When Executed by Another Workflow"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://yfvmutoxmibqzvyklggr.supabase.co/storage/v1/object/sign/sources/{{ $json.filePath }}",
+        "url": "=https://qreqmcprolrpqkrdpwrl.supabase.co/storage/v1/object/sign/sources/{{ $json.filePath }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendBody": true,
@@ -34,21 +34,21 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        280,
-        180
+        1856,
+        2048
       ],
-      "id": "eacc6b5c-ff5f-40c1-bfb2-4968317a1ecc",
+      "id": "e307a666-728e-4093-8fd7-bee2b21258c2",
       "name": "Generate Signed URL",
       "credentials": {
         "supabaseApi": {
-          "id": "OeYUddl4OaIohMCC",
-          "name": "MynotebookLM Supabase"
+          "id": "Z72m4xkuIEBqxMlM",
+          "name": "Supabase account"
         }
       }
     },
     {
       "parameters": {
-        "url": "=https://yfvmutoxmibqzvyklggr.supabase.co/storage/v1/{{ $json.signedURL }}",
+        "url": "=https://qreqmcprolrpqkrdpwrl.supabase.co/storage/v1/{{ $json.signedURL }}",
         "options": {
           "response": {
             "response": {
@@ -60,10 +60,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        500,
-        180
+        2080,
+        2048
       ],
-      "id": "9c5245a7-cbe8-4217-902b-7f1c42bfc3e2",
+      "id": "0672e60b-78dd-4b48-b09c-91ba555b89c7",
       "name": "Download File"
     },
     {
@@ -145,10 +145,10 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        720,
-        180
+        2304,
+        2048
       ],
-      "id": "b9643850-737a-405f-9ff0-1903d9424cd1",
+      "id": "901ceeab-2424-4fd7-b4aa-ef95f4558d23",
       "name": "Switch"
     },
     {
@@ -159,32 +159,11 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
       "position": [
-        940,
-        -20
+        2512,
+        1856
       ],
-      "id": "ceeb5000-0dbc-4d18-9a29-7bc2c83ff959",
+      "id": "75c01b24-38cf-4083-bc83-e3d79d16d40c",
       "name": "Extract from File"
-    },
-    {
-      "parameters": {
-        "resource": "audio",
-        "operation": "transcribe",
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.openAi",
-      "typeVersion": 1.8,
-      "position": [
-        940,
-        180
-      ],
-      "id": "e8c24cd1-0d5e-452e-97ef-cb997a9c603e",
-      "name": "OpenAI",
-      "credentials": {
-        "openAiApi": {
-          "id": "hNalDChhNUDtYG7T",
-          "name": "OpenAi account"
-        }
-      }
     },
     {
       "parameters": {
@@ -203,10 +182,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        940,
-        380
+        2512,
+        2256
       ],
-      "id": "45462a2a-a13e-45c0-8857-21f924c721ea",
+      "id": "fa124e69-363e-41a5-b18d-f643252405f8",
       "name": "Edit Fields1"
     },
     {
@@ -226,26 +205,11 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1160,
-        180
+        2736,
+        2048
       ],
-      "id": "83cae3e9-ba19-4cdd-ac7e-0d4b4515eaad",
+      "id": "237d861b-8183-4550-9d8c-147b617a62c7",
       "name": "Extracted Text"
-    },
-    {
-      "parameters": {
-        "content": "## To Do \n- Configure the Supabase nodes to reference your Project\n- Update the Host of the \"HTTP Requests\" to hit your project\n- Setup OpenAI credentials",
-        "width": 680,
-        "color": 4
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        1420,
-        100
-      ],
-      "id": "a550ac25-8226-46af-8c55-5f42f1abd0e9",
-      "name": "Sticky Note"
     },
     {
       "parameters": {
@@ -257,11 +221,32 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        60,
-        -200
+        1632,
+        1664
       ],
-      "id": "3f1e49b6-b7b4-49d0-a2e7-c50ab1cd8f3d",
+      "id": "381e201d-b6fb-49ca-be4b-ac48126e3601",
       "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        2528,
+        2048
+      ],
+      "id": "3f4bb816-f4bd-4178-910b-4838867f8a6d",
+      "name": "Transcribe a recording1",
+      "credentials": {
+        "openAiApi": {
+          "id": "syHUxLmNIXSrPaSC",
+          "name": "OpenAi account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -299,7 +284,7 @@
         ],
         [
           {
-            "node": "OpenAI",
+            "node": "Transcribe a recording1",
             "type": "main",
             "index": 0
           }
@@ -335,7 +320,7 @@
         ]
       ]
     },
-    "OpenAI": {
+    "Edit Fields1": {
       "main": [
         [
           {
@@ -346,7 +331,7 @@
         ]
       ]
     },
-    "Edit Fields1": {
+    "Transcribe a recording1": {
       "main": [
         [
           {
@@ -358,14 +343,16 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate"
   },
-  "versionId": "28c069b3-6e86-4169-82b3-50bcfad834f7",
+  "versionId": "8a890e77-ae5a-4d37-adfb-fb8b57805370",
   "meta": {
-    "instanceId": "b5d1ea132a4e071e6288b3143f31284b91560858bdef3f0c88a49f587fc91a29"
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8aa65990611bf8c8eff44388d5865e91c835317eab848ea9b81a93b6e1a15d69"
   },
-  "id": "AzZ5a2zCGU1O3MRV",
+  "id": "VBnXoWEIm6JWzjtk",
   "tags": []
 }

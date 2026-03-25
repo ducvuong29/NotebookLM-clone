@@ -22,4 +22,27 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.env.example
+.gitnexus
+
+# AI Agent & Workflow directories
+.agent/
+.agents/
+.claude/
+.serena/
+_bmad/
+_bmad-output/
+design-artifacts/
+temp_n8n_query/
+
+# AI Agent docs/configs
+AGENTS.md
+AGENTS_GUIDE.md
+CLAUDE.md
+
+# Application Database Files
+n8n_db.sqlite*
+
+# Secrets
 .env
+.roo/

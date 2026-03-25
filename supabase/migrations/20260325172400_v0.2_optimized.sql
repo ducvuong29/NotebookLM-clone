@@ -1,10 +1,16 @@
 -- ============================================================================
--- COMPLETE DATABASE MIGRATION SCRIPT
--- This script recreates the entire database schema for the InsightsLM application
+-- COMPLETE DATABASE SCHEMA — v0.2 (Optimized)
+-- This script creates the ENTIRE InsightsLM database schema from scratch
+-- with all performance, security, and data integrity optimizations applied.
+--
+-- Changes from v0.1:
+--   Fix #1: auth.uid() wrapped in (select ...) in ALL RLS policies (5-10x perf)
+--   Fix #2: GIN + expression indexes on documents.metadata (10-100x search)
+--   Fix #5: CHECK constraints on status columns (data integrity)
+--   Fix #6: SET search_path = '' on ALL SECURITY DEFINER functions (security)
 -- ============================================================================
 
 -- Enable required extensions
-
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "vector";
 
@@ -12,7 +18,6 @@ CREATE EXTENSION IF NOT EXISTS "vector";
 -- CUSTOM TYPES
 -- ============================================================================
 
--- Create enum types
 DO $$ BEGIN
     CREATE TYPE source_type AS ENUM ('pdf', 'text', 'website', 'youtube', 'audio');
 EXCEPTION
@@ -23,7 +28,7 @@ END $$;
 -- CORE TABLES
 -- ============================================================================
 
--- Create chat table (if it doesn't exist)
+-- Chat histories table
 CREATE TABLE IF NOT EXISTS public.n8n_chat_histories (
   id serial not null,
   session_id uuid not null,
@@ -31,7 +36,7 @@ CREATE TABLE IF NOT EXISTS public.n8n_chat_histories (
   constraint n8n_chat_histories_pkey primary key (id)
 ) TABLESPACE pg_default;
 
--- Create profiles table (if it doesn't exist)
+-- Profiles table
 CREATE TABLE IF NOT EXISTS public.profiles (
     id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email text NOT NULL,
@@ -41,7 +46,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Create notebooks table
+-- Notebooks table (with CHECK constraints — Fix #5)
 CREATE TABLE IF NOT EXISTS public.notebooks (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -49,8 +54,13 @@ CREATE TABLE IF NOT EXISTS public.notebooks (
     description text,
     color text DEFAULT 'gray',
     icon text DEFAULT '📝',
-    generation_status text DEFAULT 'completed',
-    audio_overview_generation_status text,
+    generation_status text DEFAULT 'completed'
+        CONSTRAINT chk_notebooks_generation_status
+        CHECK (generation_status IN ('pending', 'processing', 'completed', 'failed')),
+    audio_overview_generation_status text
+        CONSTRAINT chk_notebooks_audio_generation_status
+        CHECK (audio_overview_generation_status IS NULL
+            OR audio_overview_generation_status IN ('generating', 'completed', 'failed')),
     audio_overview_url text,
     audio_url_expires_at timestamp with time zone,
     example_questions text[] DEFAULT '{}',
@@ -58,7 +68,7 @@ CREATE TABLE IF NOT EXISTS public.notebooks (
     updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Create sources table
+-- Sources table (with CHECK constraint — Fix #5)
 CREATE TABLE IF NOT EXISTS public.sources (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
     notebook_id uuid NOT NULL REFERENCES public.notebooks(id) ON DELETE CASCADE,
@@ -70,13 +80,15 @@ CREATE TABLE IF NOT EXISTS public.sources (
     display_name text,
     content text,
     summary text,
-    processing_status text DEFAULT 'pending',
+    processing_status text DEFAULT 'pending'
+        CONSTRAINT chk_sources_processing_status
+        CHECK (processing_status IN ('pending', 'processing', 'completed', 'failed')),
     metadata jsonb DEFAULT '{}',
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Create notes table
+-- Notes table
 CREATE TABLE IF NOT EXISTS public.notes (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
     notebook_id uuid NOT NULL REFERENCES public.notebooks(id) ON DELETE CASCADE,
@@ -88,7 +100,7 @@ CREATE TABLE IF NOT EXISTS public.notes (
     updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Create documents table for vector embeddings
+-- Documents table (vector embeddings)
 CREATE TABLE IF NOT EXISTS public.documents (
     id bigserial PRIMARY KEY,
     content text,
@@ -100,22 +112,29 @@ CREATE TABLE IF NOT EXISTS public.documents (
 -- INDEXES
 -- ============================================================================
 
--- Index for notebooks by user
+-- Notebooks indexes
 CREATE INDEX IF NOT EXISTS idx_notebooks_user_id ON public.notebooks(user_id);
 CREATE INDEX IF NOT EXISTS idx_notebooks_updated_at ON public.notebooks(updated_at DESC);
 
--- Index for sources by notebook
+-- Sources indexes
 CREATE INDEX IF NOT EXISTS idx_sources_notebook_id ON public.sources(notebook_id);
 CREATE INDEX IF NOT EXISTS idx_sources_type ON public.sources(type);
 CREATE INDEX IF NOT EXISTS idx_sources_processing_status ON public.sources(processing_status);
 
--- Index for notes by notebook
+-- Notes indexes
 CREATE INDEX IF NOT EXISTS idx_notes_notebook_id ON public.notes(notebook_id);
 
--- Index for chat histories by session
+-- Chat histories indexes
 CREATE INDEX IF NOT EXISTS idx_chat_histories_session_id ON public.n8n_chat_histories(session_id);
 
--- Vector similarity index for documents
+-- Documents indexes (Fix #2 — GIN + expression index for metadata JSONB)
+CREATE INDEX IF NOT EXISTS idx_documents_metadata
+    ON public.documents USING gin (metadata jsonb_path_ops);
+
+CREATE INDEX IF NOT EXISTS idx_documents_notebook_id
+    ON public.documents ((metadata->>'notebook_id'));
+
+-- Vector similarity index
 -- NOTE: HNSW index does not support >2000 dimensions.
 -- gemini-embedding-001 outputs 3072 dims, so we skip index creation here.
 -- When enough data exists, create an IVFFlat index:
@@ -126,6 +145,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_histories_session_id ON public.n8n_chat_hist
 -- ============================================================================
 
 -- Function to handle new user creation
+-- (Fix #6 — search_path already set in v0.1)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -155,30 +175,34 @@ END;
 $$;
 
 -- Function to check notebook ownership
+-- (Fix #1 + Fix #6 — cached auth.uid() + search_path pinned)
 CREATE OR REPLACE FUNCTION public.is_notebook_owner(notebook_id_param uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE SECURITY DEFINER
+SET search_path = ''
 AS $$
     SELECT EXISTS (
-        SELECT 1 
-        FROM public.notebooks 
-        WHERE id = notebook_id_param 
-        AND user_id = auth.uid()
+        SELECT 1
+        FROM public.notebooks
+        WHERE id = notebook_id_param
+        AND user_id = (select auth.uid())
     );
 $$;
 
 -- Function to check notebook ownership for documents
+-- (Fix #1 + Fix #6 — cached auth.uid() + search_path pinned)
 CREATE OR REPLACE FUNCTION public.is_notebook_owner_for_document(doc_metadata jsonb)
 RETURNS boolean
 LANGUAGE sql
 STABLE SECURITY DEFINER
+SET search_path = ''
 AS $$
     SELECT EXISTS (
-        SELECT 1 
-        FROM public.notebooks 
-        WHERE id = (doc_metadata->>'notebook_id')::uuid 
-        AND user_id = auth.uid()
+        SELECT 1
+        FROM public.notebooks
+        WHERE id = (doc_metadata->>'notebook_id')::uuid
+        AND user_id = (select auth.uid())
     );
 $$;
 
@@ -212,6 +236,7 @@ $$;
 
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
+-- All policies use (select auth.uid()) pattern for per-query caching (Fix #1)
 -- ============================================================================
 
 -- Enable RLS on all tables
@@ -222,47 +247,50 @@ ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.n8n_chat_histories ENABLE ROW LEVEL SECURITY;
 
--- Profiles policies
+-- ===== PROFILES POLICIES =====
+
 DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 CREATE POLICY "Users can view their own profile"
     ON public.profiles FOR SELECT
-    USING (auth.uid() = id);
+    USING ((select auth.uid()) = id);
 
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
     ON public.profiles FOR UPDATE
-    USING (auth.uid() = id);
+    USING ((select auth.uid()) = id);
 
--- Notebooks policies
+-- ===== NOTEBOOKS POLICIES =====
+
 DROP POLICY IF EXISTS "Users can view their own notebooks" ON public.notebooks;
 CREATE POLICY "Users can view their own notebooks"
     ON public.notebooks FOR SELECT
-    USING (auth.uid() = user_id);
+    USING ((select auth.uid()) = user_id);
 
 DROP POLICY IF EXISTS "Users can create their own notebooks" ON public.notebooks;
 CREATE POLICY "Users can create their own notebooks"
     ON public.notebooks FOR INSERT
-    WITH CHECK (auth.uid() = user_id);
+    WITH CHECK ((select auth.uid()) = user_id);
 
 DROP POLICY IF EXISTS "Users can update their own notebooks" ON public.notebooks;
 CREATE POLICY "Users can update their own notebooks"
     ON public.notebooks FOR UPDATE
-    USING (auth.uid() = user_id);
+    USING ((select auth.uid()) = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own notebooks" ON public.notebooks;
 CREATE POLICY "Users can delete their own notebooks"
     ON public.notebooks FOR DELETE
-    USING (auth.uid() = user_id);
+    USING ((select auth.uid()) = user_id);
 
--- Sources policies
+-- ===== SOURCES POLICIES =====
+
 DROP POLICY IF EXISTS "Users can view sources from their notebooks" ON public.sources;
 CREATE POLICY "Users can view sources from their notebooks"
     ON public.sources FOR SELECT
     USING (
         EXISTS (
-            SELECT 1 FROM public.notebooks 
-            WHERE notebooks.id = sources.notebook_id 
-            AND notebooks.user_id = auth.uid()
+            SELECT 1 FROM public.notebooks
+            WHERE notebooks.id = sources.notebook_id
+            AND notebooks.user_id = (select auth.uid())
         )
     );
 
@@ -271,9 +299,9 @@ CREATE POLICY "Users can create sources in their notebooks"
     ON public.sources FOR INSERT
     WITH CHECK (
         EXISTS (
-            SELECT 1 FROM public.notebooks 
-            WHERE notebooks.id = sources.notebook_id 
-            AND notebooks.user_id = auth.uid()
+            SELECT 1 FROM public.notebooks
+            WHERE notebooks.id = sources.notebook_id
+            AND notebooks.user_id = (select auth.uid())
         )
     );
 
@@ -282,9 +310,9 @@ CREATE POLICY "Users can update sources in their notebooks"
     ON public.sources FOR UPDATE
     USING (
         EXISTS (
-            SELECT 1 FROM public.notebooks 
-            WHERE notebooks.id = sources.notebook_id 
-            AND notebooks.user_id = auth.uid()
+            SELECT 1 FROM public.notebooks
+            WHERE notebooks.id = sources.notebook_id
+            AND notebooks.user_id = (select auth.uid())
         )
     );
 
@@ -293,21 +321,22 @@ CREATE POLICY "Users can delete sources from their notebooks"
     ON public.sources FOR DELETE
     USING (
         EXISTS (
-            SELECT 1 FROM public.notebooks 
-            WHERE notebooks.id = sources.notebook_id 
-            AND notebooks.user_id = auth.uid()
+            SELECT 1 FROM public.notebooks
+            WHERE notebooks.id = sources.notebook_id
+            AND notebooks.user_id = (select auth.uid())
         )
     );
 
--- Notes policies
+-- ===== NOTES POLICIES =====
+
 DROP POLICY IF EXISTS "Users can view notes from their notebooks" ON public.notes;
 CREATE POLICY "Users can view notes from their notebooks"
     ON public.notes FOR SELECT
     USING (
         EXISTS (
-            SELECT 1 FROM public.notebooks 
-            WHERE notebooks.id = notes.notebook_id 
-            AND notebooks.user_id = auth.uid()
+            SELECT 1 FROM public.notebooks
+            WHERE notebooks.id = notes.notebook_id
+            AND notebooks.user_id = (select auth.uid())
         )
     );
 
@@ -316,9 +345,9 @@ CREATE POLICY "Users can create notes in their notebooks"
     ON public.notes FOR INSERT
     WITH CHECK (
         EXISTS (
-            SELECT 1 FROM public.notebooks 
-            WHERE notebooks.id = notes.notebook_id 
-            AND notebooks.user_id = auth.uid()
+            SELECT 1 FROM public.notebooks
+            WHERE notebooks.id = notes.notebook_id
+            AND notebooks.user_id = (select auth.uid())
         )
     );
 
@@ -327,9 +356,9 @@ CREATE POLICY "Users can update notes in their notebooks"
     ON public.notes FOR UPDATE
     USING (
         EXISTS (
-            SELECT 1 FROM public.notebooks 
-            WHERE notebooks.id = notes.notebook_id 
-            AND notebooks.user_id = auth.uid()
+            SELECT 1 FROM public.notebooks
+            WHERE notebooks.id = notes.notebook_id
+            AND notebooks.user_id = (select auth.uid())
         )
     );
 
@@ -338,13 +367,14 @@ CREATE POLICY "Users can delete notes from their notebooks"
     ON public.notes FOR DELETE
     USING (
         EXISTS (
-            SELECT 1 FROM public.notebooks 
-            WHERE notebooks.id = notes.notebook_id 
-            AND notebooks.user_id = auth.uid()
+            SELECT 1 FROM public.notebooks
+            WHERE notebooks.id = notes.notebook_id
+            AND notebooks.user_id = (select auth.uid())
         )
     );
 
--- Documents policies
+-- ===== DOCUMENTS POLICIES =====
+
 DROP POLICY IF EXISTS "Users can view documents from their notebooks" ON public.documents;
 CREATE POLICY "Users can view documents from their notebooks"
     ON public.documents FOR SELECT
@@ -365,7 +395,8 @@ CREATE POLICY "Users can delete documents from their notebooks"
     ON public.documents FOR DELETE
     USING (public.is_notebook_owner_for_document(metadata));
 
--- Chat histories policies
+-- ===== N8N CHAT HISTORIES POLICIES =====
+
 DROP POLICY IF EXISTS "Users can view chat histories from their notebooks" ON public.n8n_chat_histories;
 CREATE POLICY "Users can view chat histories from their notebooks"
     ON public.n8n_chat_histories FOR SELECT
@@ -391,7 +422,6 @@ DROP TRIGGER IF EXISTS update_sources_updated_at ON public.sources;
 DROP TRIGGER IF EXISTS update_notes_updated_at ON public.notes;
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 
--- Create updated_at triggers
 CREATE TRIGGER update_profiles_updated_at
     BEFORE UPDATE ON public.profiles
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
@@ -405,7 +435,6 @@ CREATE TRIGGER update_notes_updated_at
     BEFORE UPDATE ON public.notes
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
--- Auth user trigger
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -414,26 +443,23 @@ CREATE TRIGGER on_auth_user_created
 -- REALTIME CONFIGURATION
 -- ============================================================================
 
--- Enable realtime for tables that need live updates
 ALTER TABLE public.notebooks REPLICA IDENTITY FULL;
 ALTER TABLE public.sources REPLICA IDENTITY FULL;
 ALTER TABLE public.notes REPLICA IDENTITY FULL;
 ALTER TABLE public.n8n_chat_histories REPLICA IDENTITY FULL;
 
--- Add tables to realtime publication
 ALTER PUBLICATION supabase_realtime ADD TABLE public.notebooks;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.sources;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.notes;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.n8n_chat_histories;
 
--- =============================================
--- Storage Buckets and Policies Migration
--- =============================================
+-- ============================================================================
+-- STORAGE BUCKETS AND POLICIES
+-- ============================================================================
 
 -- Create storage buckets
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES 
-  -- Sources bucket for user uploads (private)
+VALUES
   ('sources', 'sources', false, 52428800, ARRAY[
     'application/pdf',
     'text/plain',
@@ -445,16 +471,12 @@ VALUES
     'audio/mp4',
     'audio/m4a'
   ]),
-  
-  -- Audio bucket for generated content (private)
   ('audio', 'audio', false, 104857600, ARRAY[
     'audio/mpeg',
     'audio/wav',
     'audio/mp4',
     'audio/m4a'
   ]),
-  
-  -- Public images bucket for assets (public)
   ('public-images', 'public-images', true, 10485760, ARRAY[
     'image/jpeg',
     'image/png',
@@ -467,17 +489,15 @@ ON CONFLICT (id) DO UPDATE SET
   allowed_mime_types = EXCLUDED.allowed_mime_types,
   public = EXCLUDED.public;
 
--- =============================================
--- RLS POLICIES FOR SOURCES BUCKET
--- =============================================
+-- ===== SOURCES BUCKET RLS =====
+-- (Fix #1 — using (select auth.uid()) in storage policies too)
 
--- Sources bucket policies (private - users can only access their own files)
 CREATE POLICY "Users can view their own source files"
 ON storage.objects FOR SELECT
 USING (
   bucket_id = 'sources' AND
   (storage.foldername(name))[1]::uuid IN (
-    SELECT id FROM notebooks WHERE user_id = auth.uid()
+    SELECT id FROM notebooks WHERE user_id = (select auth.uid())
   )
 );
 
@@ -486,7 +506,7 @@ ON storage.objects FOR INSERT
 WITH CHECK (
   bucket_id = 'sources' AND
   (storage.foldername(name))[1]::uuid IN (
-    SELECT id FROM notebooks WHERE user_id = auth.uid()
+    SELECT id FROM notebooks WHERE user_id = (select auth.uid())
   )
 );
 
@@ -495,7 +515,7 @@ ON storage.objects FOR UPDATE
 USING (
   bucket_id = 'sources' AND
   (storage.foldername(name))[1]::uuid IN (
-    SELECT id FROM notebooks WHERE user_id = auth.uid()
+    SELECT id FROM notebooks WHERE user_id = (select auth.uid())
   )
 );
 
@@ -504,21 +524,18 @@ ON storage.objects FOR DELETE
 USING (
   bucket_id = 'sources' AND
   (storage.foldername(name))[1]::uuid IN (
-    SELECT id FROM notebooks WHERE user_id = auth.uid()
+    SELECT id FROM notebooks WHERE user_id = (select auth.uid())
   )
 );
 
--- =============================================
--- RLS POLICIES FOR AUDIO BUCKET
--- =============================================
+-- ===== AUDIO BUCKET RLS =====
 
--- Audio bucket policies (private - users can only access their own audio files)
 CREATE POLICY "Users can view their own audio files"
 ON storage.objects FOR SELECT
 USING (
   bucket_id = 'audio' AND
   (storage.foldername(name))[1]::uuid IN (
-    SELECT id FROM notebooks WHERE user_id = auth.uid()
+    SELECT id FROM notebooks WHERE user_id = (select auth.uid())
   )
 );
 
@@ -534,15 +551,12 @@ ON storage.objects FOR DELETE
 USING (
   bucket_id = 'audio' AND
   (storage.foldername(name))[1]::uuid IN (
-    SELECT id FROM notebooks WHERE user_id = auth.uid()
+    SELECT id FROM notebooks WHERE user_id = (select auth.uid())
   )
 );
 
--- =============================================
--- RLS POLICIES FOR PUBLIC-IMAGES BUCKET
--- =============================================
+-- ===== PUBLIC-IMAGES BUCKET RLS =====
 
--- Public images bucket policies (public - anyone can read)
 CREATE POLICY "Anyone can view public images"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'public-images');

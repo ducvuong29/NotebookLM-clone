@@ -52,7 +52,7 @@ export const useNotebookGeneration = () => {
       });
     },
   });
-
+  
   return {
     generateNotebookContent: generateNotebookContent.mutate,
     generateNotebookContentAsync: generateNotebookContent.mutateAsync,
