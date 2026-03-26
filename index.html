@@ -2,11 +2,27 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script>
+      (function() {
+        var t = localStorage.getItem('theme');
+        var d = document.documentElement;
+        if (t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          d.classList.add('dark');
+        } else {
+          d.classList.remove('dark');
+        }
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>InsightsLM</title>
     <meta name="description" content="Your AI-powered knowledge companion" />
     <meta name="author" content="Lovable" />
+
+    <!-- Google Fonts: Inter (body) + JetBrains Mono (code/citations) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
 
     <meta property="og:title" content="InsightsLM" />
     <meta property="og:description" content="Your AI-powered knowledge companion" />

@@ -135,11 +135,6 @@ const SourcesSidebar = ({
   };
 
   const handleSourceClick = (source: any) => {
-    console.log('SourcesSidebar: Source clicked from list', {
-      sourceId: source.id,
-      sourceTitle: source.title
-    });
-
     // Clear any existing citation state first
     if (setSelectedCitation) {
       setSelectedCitation(null);
@@ -159,8 +154,6 @@ const SourcesSidebar = ({
       // Deliberately omitting chunk_lines_from and chunk_lines_to to prevent auto-scroll
     };
 
-    console.log('SourcesSidebar: Created mock citation', mockCitation);
-
     // Set the mock citation after a small delay to ensure state is clean
     setTimeout(() => {
       if (setSelectedCitation) {
@@ -170,7 +163,6 @@ const SourcesSidebar = ({
   };
 
   const handleBackToSources = () => {
-    console.log('SourcesSidebar: Back to sources clicked');
     setSelectedSourceForViewing(null);
     onCitationClose?.();
   };
@@ -185,13 +177,6 @@ const SourcesSidebar = ({
 
   // If we have a selected citation, show the content viewer
   if (selectedCitation) {
-    console.log('SourcesSidebar: Rendering content viewer for citation', {
-      citationId: selectedCitation.citation_id,
-      sourceId: selectedCitation.source_id,
-      hasLineData: !!(selectedCitation.chunk_lines_from && selectedCitation.chunk_lines_to),
-      isFromSourceList: selectedCitation.citation_id === -1
-    });
-
     // Determine which citation to display and get appropriate content/summary/url
     const displayCitation = selectedCitation;
     const sourceContent = selectedSourceForViewing ? getSelectedSourceContent() : getSourceContent(selectedCitation);
@@ -199,10 +184,10 @@ const SourcesSidebar = ({
     const sourceUrl = selectedSourceForViewing ? getSelectedSourceUrl() : getSourceUrl(selectedCitation);
 
     return (
-      <div className="w-full bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex-shrink-0">
+      <div className="w-full bg-muted/30 border-r border-border flex flex-col h-full overflow-hidden">
+        <div className="p-4 border-b border-border flex-shrink-0">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-gray-900 cursor-pointer hover:text-gray-700" onClick={handleBackToSources}>
+            <h2 className="text-lg font-medium text-foreground cursor-pointer hover:text-foreground/80" onClick={handleBackToSources}>
               Sources
             </h2>
             <Button variant="ghost" onClick={handleBackToSources} className="p-2 [&_svg]:!w-6 [&_svg]:!h-6">
@@ -226,10 +211,10 @@ const SourcesSidebar = ({
   }
 
   return (
-    <div className="w-full bg-gray-50 border-r border-gray-200 flex flex-col h-full overflow-hidden">
-      <div className="p-4 border-b border-gray-200 flex-shrink-0">
+    <div className="w-full bg-muted/30 border-r border-border flex flex-col h-full overflow-hidden">
+      <div className="p-4 border-b border-border flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-gray-900">Sources</h2>
+          <h2 className="text-lg font-medium text-foreground">Sources</h2>
         </div>
         
         <div className="flex space-x-2">
@@ -251,14 +236,14 @@ const SourcesSidebar = ({
               {sources.map((source) => (
                 <ContextMenu key={source.id}>
                   <ContextMenuTrigger>
-                    <Card className="p-3 border border-gray-200 cursor-pointer hover:bg-gray-50" onClick={() => handleSourceClick(source)}>
+                    <Card className="p-3 border border-border cursor-pointer hover:bg-muted" onClick={() => handleSourceClick(source)}>
                       <div className="flex items-start justify-between space-x-3">
                         <div className="flex items-center space-x-2 flex-1 min-w-0">
-                          <div className="w-6 h-6 bg-white rounded border border-gray-200 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          <div className="w-6 h-6 bg-background rounded border border-border flex items-center justify-center flex-shrink-0 overflow-hidden">
                             {renderSourceIcon(source.type)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <span className="text-sm text-gray-900 truncate block">{source.title}</span>
+                            <span className="text-sm text-foreground truncate block">{source.title}</span>
                           </div>
                         </div>
                         <div className="flex-shrink-0 py-[4px]">
@@ -282,11 +267,11 @@ const SourcesSidebar = ({
             </div>
           ) : (
             <div className="text-center py-8">
-              <div className="w-16 h-16 bg-gray-200 rounded-lg mx-auto mb-4 flex items-center justify-center">
-                <span className="text-gray-400 text-2xl">📄</span>
+              <div className="w-16 h-16 bg-muted rounded-lg mx-auto mb-4 flex items-center justify-center">
+                <span className="text-muted-foreground text-2xl">📄</span>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Saved sources will appear here</h3>
-              <p className="text-sm text-gray-600 mb-4">Click Add source above to add PDFs, text, or audio files.</p>
+              <h3 className="text-lg font-medium text-foreground mb-2">Nguồn đã lưu sẽ xuất hiện ở đây</h3>
+              <p className="text-sm text-muted-foreground mb-4">Nhấn Thêm nguồn ở trên để thêm PDF, văn bản hoặc file âm thanh.</p>
             </div>
           )}
         </div>

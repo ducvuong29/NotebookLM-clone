@@ -41,9 +41,7 @@ interface N8nAiResponseContent {
 }
 
 const transformMessage = (item: any, sourceMap: Map<string, any>): EnhancedChatMessage => {
-  console.log('Processing item:', item);
   
-  // Handle the message format based on your JSON examples
   let transformedMessage: EnhancedChatMessage['message'];
   
   // Check if message is an object and has the expected structure
@@ -116,7 +114,6 @@ const transformMessage = (item: any, sourceMap: Map<string, any>): EnhancedChatM
           };
         }
       } catch (parseError) {
-        console.log('Failed to parse AI content as JSON, treating as plain text:', parseError);
         // If parsing fails, treat as regular string content
         transformedMessage = {
           type: 'ai',
@@ -151,8 +148,6 @@ const transformMessage = (item: any, sourceMap: Map<string, any>): EnhancedChatM
       content: 'Unable to parse message'
     };
   }
-
-  console.log('Transformed message:', transformedMessage);
 
   return {
     id: item.id,
@@ -191,8 +186,6 @@ export const useChatMessages = (notebookId?: string) => {
       
       const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
       
-      console.log('Raw data from database:', data);
-      console.log('Sources map:', sourceMap);
       
       // Transform the data to match our expected format
       return data.map((item) => transformMessage(item, sourceMap));
@@ -206,8 +199,6 @@ export const useChatMessages = (notebookId?: string) => {
   useEffect(() => {
     if (!notebookId || !user) return;
 
-    console.log('Setting up Realtime subscription for notebook:', notebookId);
-
     const channel = supabase
       .channel('chat-messages')
       .on(
@@ -219,8 +210,6 @@ export const useChatMessages = (notebookId?: string) => {
           filter: `session_id=eq.${notebookId}`
         },
         async (payload) => {
-          console.log('Realtime: New message received:', payload);
-          
           // Fetch sources for proper transformation
           const { data: sourcesData } = await supabase
             .from('sources')
@@ -237,21 +226,16 @@ export const useChatMessages = (notebookId?: string) => {
             // Check if message already exists to prevent duplicates
             const messageExists = oldMessages.some(msg => msg.id === newMessage.id);
             if (messageExists) {
-              console.log('Message already exists, skipping:', newMessage.id);
               return oldMessages;
             }
             
-            console.log('Adding new message to cache:', newMessage);
             return [...oldMessages, newMessage];
           });
         }
       )
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('Cleaning up Realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [notebookId, user, queryClient]);
@@ -280,16 +264,20 @@ export const useChatMessages = (notebookId?: string) => {
       return webhookResponse.data;
     },
     onSuccess: () => {
-      // The response will appear via Realtime, so we don't need to do anything here
-      console.log('Message sent to webhook successfully');
+      // The response will appear via Realtime
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Lỗi gửi tin nhắn',
+        description: 'Chưa lấy được câu trả lời. Vui lòng thử lại.',
+        variant: 'destructive',
+      });
     },
   });
 
   const deleteChatHistory = useMutation({
     mutationFn: async (notebookId: string) => {
       if (!user) throw new Error('User not authenticated');
-
-      console.log('Deleting chat history for notebook:', notebookId);
       
       const { error } = await supabase
         .from('n8n_chat_histories')
@@ -297,18 +285,15 @@ export const useChatMessages = (notebookId?: string) => {
         .eq('session_id', notebookId);
 
       if (error) {
-        console.error('Error deleting chat history:', error);
         throw error;
       }
       
-      console.log('Chat history deleted successfully');
       return notebookId;
     },
     onSuccess: (notebookId) => {
-      console.log('Chat history cleared for notebook:', notebookId);
       toast({
-        title: "Chat history cleared",
-        description: "All messages have been deleted successfully.",
+        title: "Đã xóa lịch sử trò chuyện",
+        description: "Toàn bộ tin nhắn đã được xóa thành công.",
       });
       
       // Clear the query data and refetch to confirm
@@ -318,10 +303,9 @@ export const useChatMessages = (notebookId?: string) => {
       });
     },
     onError: (error) => {
-      console.error('Failed to delete chat history:', error);
       toast({
-        title: "Error",
-        description: "Failed to clear chat history. Please try again.",
+        title: "Lỗi",
+        description: "Không thể xóa lịch sử trò chuyện. Vui lòng thử lại.",
         variant: "destructive",
       });
     }

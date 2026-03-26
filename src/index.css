@@ -4,89 +4,187 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* ===== shadcn/ui Core Tokens (HSL format — DO NOT change format) ===== */
+    --background: 0 0% 98%;
+    --foreground: 215 27.9% 16.9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 215 27.9% 16.9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 215 27.9% 16.9%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 243.4 75.4% 58.6%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 215 27.9% 16.9%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 218 10.6% 64.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 215 27.9% 16.9%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 243.4 75.4% 58.6%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
+    --sidebar-primary: 243.4 75.4% 58.6%;
+    --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 243.4 75.4% 58.6%;
 
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* ===== InsightsLM Material Semantic Tokens ===== */
+    --im-primary: #4f46e5;
+    --im-primary-hover: #4338ca;
+    --im-primary-light: #eef2ff;
+    --im-surface: #fafafa;
+    --im-card-hover: #f8fafc;
+    --im-text-primary: #1f2937;
+    --im-text-secondary: #6b7280;
+    --im-text-muted: #9ca3af;
+    --im-success: #10b981;
+    --im-warning: #f59e0b;
+    --im-error: #ef4444;
+    --im-info: #3b82f6;
+
+    /* ===== Spacing Tokens (4px base unit) ===== */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-2xl: 48px;
+
+    /* ===== Shadow Tokens (Material Modern elevations) ===== */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+    /* ===== Radius Tokens ===== */
+    --radius-sm: 6px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+
+    /* ===== Department Color Palette (Light Mode) ===== */
+    --dept-1-bg: #dbeafe;
+    --dept-1-fg: #3b82f6;
+    --dept-2-bg: #fce7f3;
+    --dept-2-fg: #ec4899;
+    --dept-3-bg: #d1fae5;
+    --dept-3-fg: #10b981;
+    --dept-4-bg: #fef3c7;
+    --dept-4-fg: #f59e0b;
+    --dept-5-bg: #ede9fe;
+    --dept-5-fg: #8b5cf6;
+    --dept-6-bg: #fee2e2;
+    --dept-6-fg: #ef4444;
+    --dept-7-bg: #ccfbf1;
+    --dept-7-fg: #14b8a6;
+    --dept-8-bg: #fff7ed;
+    --dept-8-fg: #f97316;
+    --dept-9-bg: #f0fdf4;
+    --dept-9-fg: #22c55e;
+    --dept-10-bg: #f5f3ff;
+    --dept-10-fg: #7c3aed;
+
+    /* ===== Animation / Motion Tokens ===== */
+    --duration-fast: 200ms;
+    --duration-normal: 300ms;
+    --duration-slow: 400ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* ===== shadcn/ui Core Tokens — Dark Mode ===== */
+    --background: 240 30.8% 7.8%;
+    --foreground: 220 14.3% 95.9%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 240 23.1% 14.9%;
+    --card-foreground: 220 14.3% 95.9%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 240 23.1% 14.9%;
+    --popover-foreground: 220 14.3% 95.9%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 239 84% 67.3%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 240 17.1% 20%;
+    --secondary-foreground: 220 14.3% 95.9%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 240 17.1% 20%;
+    --muted-foreground: 220 8.9% 46.1%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 240 17.1% 20%;
+    --accent-foreground: 220 14.3% 95.9%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 90.6% 70.8%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 218 17.2% 27.1%;
+    --input: 218 17.2% 27.1%;
+    --ring: 239 84% 67.3%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary: 239 84% 67.3%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 239 84% 67.3%;
+
+    /* ===== InsightsLM Material Semantic Tokens — Dark Mode ===== */
+    --im-primary: #818cf8;
+    --im-primary-hover: #a5b4fc;
+    --im-primary-light: #312e81;
+    --im-surface: #0f0f1a;
+    --im-card-hover: #2a2a3c;
+    --im-text-primary: #f3f4f6;
+    --im-text-secondary: #9ca3af;
+    --im-text-muted: #6b7280;
+    --im-success: #34d399;
+    --im-warning: #fbbf24;
+    --im-error: #f87171;
+    --im-info: #60a5fa;
+
+    /* ===== Shadow Tokens — Dark Mode (higher opacity) ===== */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+    /* ===== Department Color Palette — Dark Mode ===== */
+    --dept-1-bg: #1e3a5f;
+    --dept-1-fg: #60a5fa;
+    --dept-2-bg: #4a1942;
+    --dept-2-fg: #f472b6;
+    --dept-3-bg: #1a3a2a;
+    --dept-3-fg: #34d399;
+    --dept-4-bg: #3d2e0a;
+    --dept-4-fg: #fbbf24;
+    --dept-5-bg: #2e1065;
+    --dept-5-fg: #a78bfa;
+    --dept-6-bg: #4a1515;
+    --dept-6-fg: #f87171;
+    --dept-7-bg: #0d3331;
+    --dept-7-fg: #2dd4bf;
+    --dept-8-bg: #3d1f00;
+    --dept-8-fg: #fb923c;
+    --dept-9-bg: #14341d;
+    --dept-9-fg: #4ade80;
+    --dept-10-bg: #1e1145;
+    --dept-10-fg: #a78bfa;
   }
 }
 
@@ -97,5 +195,65 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family:
+      "Plus Jakarta Sans",
+      "Inter",
+      system-ui,
+      -apple-system,
+      sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Playfair Display", Georgia, serif;
+    letter-spacing: -0.02em;
+  }
+
+  /* Global Focus Visible Indicator */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+  }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 13px;
+  }
+}
+
+/* ===== Skeleton Pulse Animation ===== */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-skeleton-pulse {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-skeleton-pulse {
+    animation: none;
+    opacity: 0.6;
   }
 }

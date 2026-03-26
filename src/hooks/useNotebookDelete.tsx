@@ -85,30 +85,31 @@ export const useNotebookDelete = () => {
       
       // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['notebooks', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['public-notebooks'] });
       queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
       queryClient.invalidateQueries({ queryKey: ['notebook', notebookId] });
       
       toast({
-        title: "Notebook deleted",
-        description: `"${deletedNotebook?.title || 'Notebook'}" and all its sources have been successfully deleted.`,
+        title: "Đã xóa notebook",
+        description: `"${deletedNotebook?.title || 'Notebook'}" và toàn bộ nguồn đã được xóa thành công.`,
       });
     },
     onError: (error: any) => {
       console.error('Delete mutation error:', error);
       
-      let errorMessage = "Failed to delete the notebook. Please try again.";
+      let errorMessage = "Không thể xóa notebook. Vui lòng thử lại.";
       
       // Provide more specific error messages based on the error type
       if (error?.code === 'PGRST116') {
-        errorMessage = "Notebook not found or you don't have permission to delete it.";
+        errorMessage = "Không tìm thấy notebook hoặc bạn không có quyền xóa.";
       } else if (error?.message?.includes('foreign key')) {
-        errorMessage = "Cannot delete notebook due to data dependencies. Please contact support.";
+        errorMessage = "Không thể xóa notebook do có dữ liệu liên quan. Vui lòng liên hệ hỗ trợ.";
       } else if (error?.message?.includes('network')) {
-        errorMessage = "Network error. Please check your connection and try again.";
+        errorMessage = "Lỗi mạng. Vui lòng kiểm tra kết nối và thử lại.";
       }
       
       toast({
-        title: "Error",
+        title: "Lỗi",
         description: errorMessage,
         variant: "destructive",
       });

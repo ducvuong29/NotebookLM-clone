@@ -68,7 +68,7 @@ const MultipleWebsiteUrlsDialog = ({
 
         <div className="space-y-4">
           <div>
-            <Label className="text-sm font-medium">Website URLs</Label>
+            <Label htmlFor="website-urls" className="text-sm font-medium">Website URLs</Label>
             <p className="text-sm text-gray-600 mb-3">
               Enter multiple website URLs, one per line. Each URL will be scraped as a separate source.
             </p>
@@ -76,6 +76,7 @@ const MultipleWebsiteUrlsDialog = ({
 
           <div>
             <Textarea
+              id="website-urls"
               placeholder={`Enter URLs one per line, for example:
 https://example.com
 https://another-site.com

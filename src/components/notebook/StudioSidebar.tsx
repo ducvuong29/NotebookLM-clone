@@ -160,28 +160,28 @@ const StudioSidebar = ({
     if (isAutoRefreshing) {
       return {
         icon: null,
-        text: "Refreshing URL...",
-        description: "Updating audio access"
+        text: "Đang làm mới URL...",
+        description: "Đang cập nhật quyền truy cập âm thanh"
       };
     }
     
     if (currentStatus === 'generating' || isGenerating) {
       return {
         icon: <Loader2 className="h-4 w-4 animate-spin text-blue-600" />,
-        text: "Generating audio...",
-        description: "This may take a few minutes"
+        text: "Đang tạo âm thanh...",
+        description: "Quá trình này có thể mất vài phút"
       };
     } else if (currentStatus === 'failed') {
       return {
         icon: <AlertCircle className="h-4 w-4 text-red-600" />,
-        text: "Generation failed",
-        description: "Please try again"
+        text: "Tạo thất bại",
+        description: "Vui lòng thử lại"
       };
     } else if (currentStatus === 'completed' && hasValidAudio) {
       return {
         icon: <CheckCircle2 className="h-4 w-4 text-green-600" />,
-        text: "Ready to play",
-        description: "Audio overview available"
+        text: "Sẵn sàng phát",
+        description: "Tổng quan âm thanh đã sẵn sàng"
       };
     }
     return null;
@@ -215,36 +215,36 @@ const StudioSidebar = ({
       </div>;
   }
 
-  return <div className="w-full bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
-      <div className="p-4 border-b border-gray-200 flex-shrink-0">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Studio</h2>
+  return <div className="w-full bg-muted/30 border-l border-border flex flex-col h-full overflow-hidden">
+      <div className="p-4 border-b border-border flex-shrink-0">
+        <h2 className="text-lg font-medium text-foreground mb-4">Studio</h2>
         
         {/* Audio Overview */}
-        <Card className="p-4 mb-4 border border-gray-200">
+        <Card className="p-4 mb-4 border border-border">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium text-gray-900">Audio Overview</h3>
+            <h3 className="font-medium text-foreground">Tổng quan Âm thanh</h3>
           </div>
 
           {hasValidAudio && !audioError && currentStatus !== 'generating' && !isAutoRefreshing ? <AudioPlayer 
               audioUrl={notebook.audio_overview_url} 
-              title="Deep Dive Conversation" 
+              title="Cuộc trò chuyện chuyên sâu" 
               notebookId={notebookId} 
               expiresAt={notebook.audio_url_expires_at} 
               onError={handleAudioError} 
               onRetry={handleAudioRetry} 
               onDeleted={handleAudioDeleted}
               onUrlRefresh={handleUrlRefresh}
-            /> : <Card className="p-3 border border-gray-200">
+            /> : <Card className="p-3 border border-border">
               {/* Hide this div when generating or auto-refreshing */}
               {currentStatus !== 'generating' && !isGenerating && !isAutoRefreshing && <div className="flex items-center space-x-3 mb-3">
                   <div className="w-8 h-8 rounded flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#111827">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" className="fill-foreground">
                       <path d="M280-120v-123q-104-14-172-93T40-520h80q0 83 58.5 141.5T320-320h10q5 0 10-1 13 20 28 37.5t32 32.5q-10 3-19.5 4.5T360-243v123h-80Zm20-282q-43-8-71.5-40.5T200-520v-240q0-50 35-85t85-35q50 0 85 35t35 85v160H280v80q0 31 5 60.5t15 57.5Zm340 2q-50 0-85-35t-35-85v-240q0-50 35-85t85-35q50 0 85 35t35 85v240q0 50-35 85t-85 35Zm-40 280v-123q-104-14-172-93t-68-184h80q0 83 58.5 141.5T640-320q83 0 141.5-58.5T840-520h80q0 105-68 184t-172 93v123h-80Zm40-360q17 0 28.5-11.5T680-520v-240q0-17-11.5-28.5T640-800q-17 0-28.5 11.5T600-760v240q0 17 11.5 28.5T640-480Zm0-160Z" />
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">Deep Dive conversation</h4>
-                    <p className="text-sm text-gray-600">Two hosts</p>
+                    <h4 className="font-medium text-foreground">Cuộc trò chuyện chuyên sâu</h4>
+                    <p className="text-sm text-muted-foreground">Hai người dẫn</p>
                   </div>
                 </div>}
               
@@ -252,8 +252,8 @@ const StudioSidebar = ({
               {getStatusDisplay() && <div className="flex items-center space-x-2 mb-3 p-2 rounded-md bg-transparent">
                   {getStatusDisplay()!.icon}
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-900">{getStatusDisplay()!.text}</p>
-                    <p className="text-xs text-slate-900">{getStatusDisplay()!.description}</p>
+                    <p className="text-sm font-medium text-foreground">{getStatusDisplay()!.text}</p>
+                    <p className="text-xs text-muted-foreground">{getStatusDisplay()!.description}</p>
                   </div>
                 </div>}
               
@@ -261,11 +261,11 @@ const StudioSidebar = ({
               {audioError && <div className="flex items-center space-x-2 mb-3 p-2 bg-red-50 rounded-md">
                   <AlertCircle className="h-4 w-4 text-red-600" />
                   <div className="flex-1">
-                    <p className="text-sm text-red-600">Audio unavailable</p>
+                    <p className="text-sm text-red-600">Âm thanh không khả dụng</p>
                   </div>
                   <Button size="sm" variant="outline" onClick={handleAudioRetry} className="text-red-600 border-red-300 hover:bg-red-50">
                     <RefreshCw className="h-4 w-4 mr-1" />
-                    Retry
+                    Thử lại
                   </Button>
                 </div>}
               
@@ -273,8 +273,8 @@ const StudioSidebar = ({
                 <Button size="sm" onClick={handleGenerateAudio} disabled={isGenerating || currentStatus === 'generating' || !hasProcessedSource || isAutoRefreshing} className="flex-1 text-white bg-slate-900 hover:bg-slate-800">
                   {isGenerating || currentStatus === 'generating' ? <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
-                    </> : 'Generate'}
+                      Đang tạo...
+                    </> : 'Tạo'}
                 </Button>
               </div>
             </Card>}
@@ -283,13 +283,13 @@ const StudioSidebar = ({
         {/* Notes Section */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium text-gray-900">Notes</h3>
+            <h3 className="font-medium text-foreground">Ghi chú</h3>
             
           </div>
           
           <Button variant="outline" size="sm" className="w-full mb-4" onClick={handleCreateNote}>
             <Plus className="h-4 w-4 mr-2" />
-            Add note
+            Thêm ghi chú
           </Button>
         </div>
       </div>
@@ -298,37 +298,37 @@ const StudioSidebar = ({
       <ScrollArea className="flex-1 h-full">
         <div className="p-4">
           {isLoading ? <div className="text-center py-8">
-              <p className="text-sm text-gray-600">Loading notes...</p>
+              <p className="text-sm text-muted-foreground">Đang tải ghi chú...</p>
             </div> : notes && notes.length > 0 ? <div className="space-y-3">
-              {notes.map(note => <Card key={note.id} className="p-3 border border-gray-200 hover:bg-gray-50 cursor-pointer" onClick={() => handleEditNote(note)}>
+              {notes.map(note => <Card key={note.id} className="p-3 border border-border hover:bg-muted cursor-pointer" onClick={() => handleEditNote(note)}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2 mb-1">
-                        {note.source_type === 'ai_response' ? <Bot className="h-3 w-3 text-blue-600" /> : <User className="h-3 w-3 text-gray-600" />}
-                        <span className="text-xs text-gray-500 uppercase">
-                          {note.source_type === 'ai_response' ? 'AI Response' : 'Note'}
+                        {note.source_type === 'ai_response' ? <Bot className="h-3 w-3 text-primary" /> : <User className="h-3 w-3 text-muted-foreground" />}
+                        <span className="text-xs text-muted-foreground uppercase">
+                          {note.source_type === 'ai_response' ? 'Trả lời AI' : 'Ghi chú'}
                         </span>
                       </div>
-                      <h4 className="font-medium text-gray-900 truncate">{note.title}</h4>
-                      <p className="text-sm text-gray-600 line-clamp-2 mt-1">
+                      <h4 className="font-medium text-foreground truncate">{note.title}</h4>
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
                         {getPreviewText(note)}
                       </p>
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs text-muted-foreground mt-2">
                         {new Date(note.updated_at).toLocaleDateString()}
                       </p>
                     </div>
-                    {note.source_type === 'user' && <Button variant="ghost" size="sm" className="ml-2">
-                        <Edit className="h-3 w-3" />
+                    {note.source_type === 'user' && <Button aria-label="Chỉnh sửa ghi chú" variant="ghost" size="sm" className="ml-2 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 p-0 md:px-3">
+                        <Edit className="h-4 w-4 md:h-3 md:w-3" />
                       </Button>}
                   </div>
                 </Card>)}
             </div> : <div className="text-center py-8">
-              <div className="w-16 h-16 bg-gray-200 rounded-lg mx-auto mb-4 flex items-center justify-center">
-                <span className="text-gray-400 text-2xl">📄</span>
+              <div className="w-16 h-16 bg-muted rounded-lg mx-auto mb-4 flex items-center justify-center">
+                <span className="text-muted-foreground text-2xl">📄</span>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Saved notes will appear here</h3>
-              <p className="text-sm text-gray-600">
-                Save a chat message to create a new note, or click Add note above.
+              <h3 className="text-lg font-medium text-foreground mb-2">Ghi chú đã lưu sẽ xuất hiện ở đây</h3>
+              <p className="text-sm text-muted-foreground">
+                Lưu tin nhắn trò chuyện để tạo ghi chú mới, hoặc nhấn Thêm ghi chú ở trên.
               </p>
             </div>}
         </div>

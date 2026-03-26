@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -8,11 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '@/components/ui/input-otp';
 
 const AuthForm = () => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [isOtpSent, setIsOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -21,71 +21,83 @@ const AuthForm = () => {
   // Redirect to dashboard if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('User is authenticated, redirecting to dashboard');
       navigate('/', { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!email) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng nhập email",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading(true);
 
     try {
-      if (isSignUp) {
-        // Sign Up
-        console.log('Attempting sign up for:', email);
-        
-        const { error, data } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-
-        if (error) {
-          console.error('Sign up error:', error);
-          throw error;
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false, // only admins can create users per FR4
         }
+      });
 
-        console.log('Sign up successful:', data.user?.email);
-
-        toast({
-          title: "Account created!",
-          description: "Please check your email to confirm your account.",
-        });
-      } else {
-        // Sign In
-        console.log('Attempting sign in for:', email);
-
-        const { error, data } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) {
-          console.error('Sign in error:', error);
-          if (error.message.includes('Invalid login credentials')) {
-            throw new Error('Invalid email or password. Please check your credentials and try again.');
-          } else if (error.message.includes('Email not confirmed')) {
-            throw new Error('Please check your email and click the confirmation link before signing in.');
-          } else {
-            throw error;
-          }
-        }
-
-        console.log('Sign in successful:', data.user?.email);
-
-        toast({
-          title: "Welcome back!",
-          description: "You have successfully signed in.",
-        });
+      if (error) {
+        throw error;
       }
 
-      // The AuthContext will handle the redirect automatically
-
-    } catch (error: any) {
-      console.error('Auth form error:', error);
+      setIsOtpSent(true);
       toast({
-        title: isSignUp ? "Sign Up Error" : "Sign In Error",
-        description: error.message,
+        title: "Đã gửi mã OTP!",
+        description: "Vui lòng kiểm tra email của bạn để lấy mã đăng nhập 8 số.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Lỗi gửi mã",
+        description: error.message || "Không thể gửi mã OTP. Vui lòng thử lại.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otp.length !== 8) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng nhập đủ 8 số OTP",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'email',
+      });
+
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Chào mừng trở lại!",
+        description: "Đăng nhập thành công.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Lỗi xác thực",
+        description: "Mã OTP không đúng hoặc đã hết hạn. Thử lại.",
         variant: "destructive",
       });
     } finally {
@@ -94,59 +106,88 @@ const AuthForm = () => {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full max-w-md mx-auto shadow-md">
       <CardHeader>
-        <CardTitle>{isSignUp ? 'Create Account' : 'Sign In'}</CardTitle>
+        <CardTitle>Đăng nhập</CardTitle>
         <CardDescription>
-          {isSignUp 
-            ? 'Enter your details to create a new account' 
-            : 'Enter your credentials to access your notebooks'}
+          {!isOtpSent 
+            ? 'Nhập email của bạn để nhận mã đăng nhập một lần (OTP)' 
+            : `Mã 8 số đã được gửi đến ${email}`}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="Enter your email"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="Enter your password"
-              minLength={6}
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading 
-              ? (isSignUp ? 'Creating Account...' : 'Signing In...') 
-              : (isSignUp ? 'Sign Up' : 'Sign In')}
-          </Button>
-        </form>
-        
-        <div className="mt-4 text-center">
-          <p className="text-sm text-gray-600">
-            {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-            <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-blue-600 hover:text-blue-700 font-medium"
-            >
-              {isSignUp ? 'Sign In' : 'Sign Up'}
-            </button>
-          </p>
-        </div>
+        {!isOtpSent ? (
+          <form onSubmit={handleSendOtp} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email công ty</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="nhanvien@company.com"
+                disabled={loading}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Đang gửi mã...' : 'Gửi mã OTP'}
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={handleVerifyOtp} className="space-y-6">
+            <div className="space-y-3 flex flex-col items-center justify-center">
+              <Label htmlFor="otp">Mã xác thực 8 số</Label>
+              <InputOTP
+                id="otp"
+                maxLength={8}
+                value={otp}
+                onChange={(value) => setOtp(value)}
+                disabled={loading}
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                  <InputOTPSlot index={3} />
+                </InputOTPGroup>
+                <InputOTPSeparator />
+                <InputOTPGroup>
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                  <InputOTPSlot index={6} />
+                  <InputOTPSlot index={7} />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+            <div className="space-y-3">
+              <Button type="submit" className="w-full" disabled={loading || otp.length !== 8}>
+                {loading ? 'Đang xác thực...' : 'Xác nhận & Đăng nhập'}
+              </Button>
+              <Button 
+                type="button" 
+                variant="ghost" 
+                className="w-full text-muted-foreground text-sm hover:text-foreground"
+                onClick={() => handleSendOtp()}
+                disabled={loading}
+              >
+                Chưa nhận được mã? Gửi lại
+              </Button>
+              <Button 
+                type="button" 
+                variant="link" 
+                className="w-full text-muted-foreground text-sm"
+                onClick={() => {
+                  setIsOtpSent(false);
+                  setOtp('');
+                }}
+                disabled={loading}
+              >
+                Sử dụng email khác
+              </Button>
+            </div>
+          </form>
+        )}
       </CardContent>
     </Card>
   );

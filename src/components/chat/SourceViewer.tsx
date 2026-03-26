@@ -44,20 +44,20 @@ const SourceViewer = ({ citation, open, onOpenChange }: SourceViewerProps) => {
         <div className="space-y-4">
           <div className="flex items-center space-x-2">
             <Badge variant="outline" className="text-xs">
-              Citation {citation.citation_id}
+              Trích dẫn {citation.citation_id}
             </Badge>
             {citation.chunk_lines_from && citation.chunk_lines_to && (
               <Badge variant="outline" className="text-xs">
-                Lines {citation.chunk_lines_from}-{citation.chunk_lines_to}
+                Dòng {citation.chunk_lines_from}-{citation.chunk_lines_to}
               </Badge>
             )}
           </div>
           
           {citation.excerpt && (
             <div className="border-l-4 border-blue-500 pl-4">
-              <h4 className="font-medium text-gray-900 mb-2">Source Excerpt</h4>
+              <h4 className="font-medium text-foreground mb-2">Trích đoạn nguồn</h4>
               <ScrollArea className="max-h-64">
-                <p className="text-sm text-gray-700 leading-relaxed">
+                <p className="text-sm text-foreground/80 leading-relaxed">
                   {citation.excerpt}
                 </p>
               </ScrollArea>

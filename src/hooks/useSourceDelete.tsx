@@ -69,26 +69,26 @@ export const useSourceDelete = () => {
       console.log('Delete mutation success, invalidating queries');
       queryClient.invalidateQueries({ queryKey: ['sources'] });
       toast({
-        title: "Source deleted",
-        description: `"${deletedSource?.title || 'Source'}" has been successfully deleted.`,
+        title: "Đã xóa nguồn",
+        description: `"${deletedSource?.title || 'Nguồn'}" đã được xóa thành công.`,
       });
     },
     onError: (error: any) => {
       console.error('Delete mutation error:', error);
       
-      let errorMessage = "Failed to delete the source. Please try again.";
+      let errorMessage = "Không thể xóa nguồn. Vui lòng thử lại.";
       
       // Provide more specific error messages based on the error type
       if (error?.code === 'PGRST116') {
-        errorMessage = "Source not found or you don't have permission to delete it.";
+        errorMessage = "Không tìm thấy nguồn hoặc bạn không có quyền xóa.";
       } else if (error?.message?.includes('foreign key')) {
-        errorMessage = "Cannot delete source due to data dependencies. Please contact support.";
+        errorMessage = "Không thể xóa nguồn do có dữ liệu liên quan. Vui lòng liên hệ hỗ trợ.";
       } else if (error?.message?.includes('network')) {
-        errorMessage = "Network error. Please check your connection and try again.";
+        errorMessage = "Lỗi mạng. Vui lòng kiểm tra kết nối và thử lại.";
       }
       
       toast({
-        title: "Error",
+        title: "Lỗi",
         description: errorMessage,
         variant: "destructive",
       });

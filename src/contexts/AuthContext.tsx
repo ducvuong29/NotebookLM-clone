@@ -113,10 +113,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           return;
         }
         
-        // For other events, update state if there's an actual change
-        if (session?.access_token !== newSession?.access_token) {
+        // For any other event, just ensure we update if a valid session exists and we're loading, 
+        // but avoid stale checks
+        if (newSession && loading) {
           updateAuthState(newSession);
-          if (loading) setLoading(false);
+          setLoading(false);
         }
       }
     );

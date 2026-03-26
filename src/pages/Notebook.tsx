@@ -9,6 +9,7 @@ import SourcesSidebar from '@/components/notebook/SourcesSidebar';
 import ChatArea from '@/components/notebook/ChatArea';
 import StudioSidebar from '@/components/notebook/StudioSidebar';
 import MobileNotebookTabs from '@/components/notebook/MobileNotebookTabs';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { Citation } from '@/types/message';
 
 const Notebook = () => {
@@ -16,6 +17,7 @@ const Notebook = () => {
   const { notebooks } = useNotebooks();
   const { sources } = useSources(notebookId);
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('chat');
   const isDesktop = useIsDesktop();
 
   const notebook = notebooks?.find(n => n.id === notebookId);
@@ -24,6 +26,10 @@ const Notebook = () => {
 
   const handleCitationClick = (citation: Citation) => {
     setSelectedCitation(citation);
+    // On mobile, auto-switch to Sources tab so the user sees the source content
+    if (!isDesktop) {
+      setActiveTab('sources');
+    }
   };
 
   const handleCitationClose = () => {
@@ -36,15 +42,15 @@ const Notebook = () => {
   const chatWidth = isSourceDocumentOpen ? 'w-[35%]' : 'w-[45%]';
 
   return (
-    <div className="h-screen bg-white flex flex-col overflow-hidden">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       <NotebookHeader 
-        title={notebook?.title || 'Untitled Notebook'} 
+        title={notebook?.title || 'Notebook chưa đặt tên'} 
         notebookId={notebookId} 
       />
       
       {isDesktop ? (
         // Desktop layout (3-column)
-        <div className="flex-1 flex overflow-hidden">
+        <main id="main-content" className="flex-1 flex overflow-hidden">
           <div className={`${sourcesWidth} flex-shrink-0`}>
             <SourcesSidebar 
               hasSource={hasSource || false} 
@@ -56,12 +62,15 @@ const Notebook = () => {
           </div>
           
           <div className={`${chatWidth} flex-shrink-0`}>
-            <ChatArea 
-              hasSource={hasSource || false} 
-              notebookId={notebookId}
-              notebook={notebook}
-              onCitationClick={handleCitationClick}
-            />
+            <ErrorBoundary key={notebookId}>
+              <ChatArea 
+                hasSource={hasSource || false} 
+                notebookId={notebookId}
+                notebook={notebook}
+                onCitationClick={handleCitationClick}
+                selectedCitation={selectedCitation}
+              />
+            </ErrorBoundary>
           </div>
           
           <div className={`${studioWidth} flex-shrink-0`}>
@@ -70,18 +79,24 @@ const Notebook = () => {
               onCitationClick={handleCitationClick}
             />
           </div>
-        </div>
+        </main>
       ) : (
         // Mobile/Tablet layout (tabs)
-        <MobileNotebookTabs
-          hasSource={hasSource || false}
-          notebookId={notebookId}
-          notebook={notebook}
-          selectedCitation={selectedCitation}
-          onCitationClose={handleCitationClose}
-          setSelectedCitation={setSelectedCitation}
-          onCitationClick={handleCitationClick}
-        />
+        <main id="main-content" className="flex-1 overflow-hidden h-full">
+          <ErrorBoundary key={notebookId}>
+            <MobileNotebookTabs
+            hasSource={hasSource || false}
+            notebookId={notebookId}
+            notebook={notebook}
+            selectedCitation={selectedCitation}
+            onCitationClose={handleCitationClose}
+            setSelectedCitation={setSelectedCitation}
+            onCitationClick={handleCitationClick}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+          />
+          </ErrorBoundary>
+        </main>
       )}
     </div>
   );

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Upload, FileText, Loader2, RefreshCw } from 'lucide-react';
+import { Send, Upload, FileText, Loader2, RefreshCw, AlertCircle, RotateCcw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -24,25 +25,32 @@ interface ChatAreaProps {
     example_questions?: string[];
   } | null;
   onCitationClick?: (citation: Citation) => void;
+  selectedCitation?: Citation | null;
 }
 
 const ChatArea = ({
   hasSource,
   notebookId,
   notebook,
-  onCitationClick
+  onCitationClick,
+  selectedCitation
 }: ChatAreaProps) => {
   const [message, setMessage] = useState('');
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
   const [showAiLoading, setShowAiLoading] = useState(false);
   const [clickedQuestions, setClickedQuestions] = useState<Set<string>>(new Set());
   const [showAddSourcesDialog, setShowAddSourcesDialog] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [showTimeout, setShowTimeout] = useState(false);
+  const lastFailedMessageRef = useRef<string | null>(null);
+  const handleSendMessageRef = useRef<(msg?: string) => void>(() => {});
+  const { toast } = useToast();
   
   const isGenerating = notebook?.generation_status === 'generating';
   
   const {
     messages,
-    sendMessage,
+    sendMessageAsync,
     isSending,
     deleteChatHistory,
     isDeletingChatHistory
@@ -78,10 +86,8 @@ const ChatArea = ({
   // Auto-scroll when pending message is set, when messages update, or when AI loading appears
   useEffect(() => {
     if (latestMessageRef.current && scrollAreaRef.current) {
-      // Find the viewport within the ScrollArea
       const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
       if (viewport) {
-        // Use a small delay to ensure the DOM has updated
         setTimeout(() => {
           latestMessageRef.current?.scrollIntoView({
             behavior: 'smooth',
@@ -91,35 +97,57 @@ const ChatArea = ({
       }
     }
   }, [pendingUserMessage, messages.length, showAiLoading]);
+
+  // Chat timeout UI indicator (30s)
+  useEffect(() => {
+    if (!showAiLoading) {
+      setShowTimeout(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowTimeout(true), 30000);
+    return () => clearTimeout(timer);
+  }, [showAiLoading]);
+
+
+  // Network reconnect: no auto-retry — user clicks the "Thử lại" button manually
   const handleSendMessage = async (messageText?: string) => {
     const textToSend = messageText || message.trim();
     if (textToSend && notebookId) {
       try {
-        // Store the pending message to display immediately
+        setChatError(null);
         setPendingUserMessage(textToSend);
-        await sendMessage({
+        await sendMessageAsync({
           notebookId: notebookId,
           role: 'user',
           content: textToSend
         });
         setMessage('');
-
-        // Show AI loading after user message is sent
+        lastFailedMessageRef.current = null;
         setShowAiLoading(true);
       } catch (error) {
-        console.error('Failed to send message:', error);
-        // Clear pending message on error
         setPendingUserMessage(null);
         setShowAiLoading(false);
+        lastFailedMessageRef.current = textToSend;
+        setChatError('Oops! Chưa lấy được câu trả lời. Thử lại nhé 😊');
       }
+    }
+  };
+  handleSendMessageRef.current = handleSendMessage;
+  const handleRetry = () => {
+    if (lastFailedMessageRef.current) {
+      setChatError(null);
+      setShowTimeout(false);
+      setShowAiLoading(false);
+      handleSendMessage(lastFailedMessageRef.current);
     }
   };
   const handleRefreshChat = () => {
     if (notebookId) {
-      console.log('Refresh button clicked for notebook:', notebookId);
       deleteChatHistory(notebookId);
-      // Reset clicked questions when chat is refreshed
       setClickedQuestions(new Set());
+      setChatError(null);
+      setShowTimeout(false);
+      lastFailedMessageRef.current = null;
     }
   };
   const handleCitationClick = (citation: Citation) => {
@@ -159,55 +187,55 @@ const ChatArea = ({
   const getPlaceholderText = () => {
     if (isChatDisabled) {
       if (sourceCount === 0) {
-        return "Upload a source to get started...";
+        return "Tải nguồn lên để bắt đầu...";
       } else {
-        return "Please wait while your sources are being processed...";
+        return "Vui lòng chờ trong khi nguồn đang được xử lý...";
       }
     }
-    return "Start typing...";
+    return "Bắt đầu nhập...";
   };
   return <div className="flex-1 flex flex-col h-full overflow-hidden">
       {hasSource ? <div className="flex-1 flex flex-col h-full overflow-hidden">
           {/* Chat Header */}
-          <div className="p-4 border-b border-gray-200 flex-shrink-0">
+          <div className="p-4 border-b border-border flex-shrink-0">
             <div className="max-w-4xl mx-auto flex items-center justify-between">
-              <h2 className="text-lg font-medium text-gray-900">Chat</h2>
+              <h2 className="text-lg font-medium text-foreground">Trò chuyện</h2>
               {shouldShowRefreshButton && <Button variant="ghost" size="sm" onClick={handleRefreshChat} disabled={isDeletingChatHistory || isChatDisabled} className="flex items-center space-x-2">
                   <RefreshCw className={`h-4 w-4 ${isDeletingChatHistory ? 'animate-spin' : ''}`} />
-                  <span>{isDeletingChatHistory ? 'Clearing...' : 'Clear Chat'}</span>
+                  <span>{isDeletingChatHistory ? 'Đang xóa...' : 'Xóa chat'}</span>
                 </Button>}
             </div>
           </div>
 
           <ScrollArea className="flex-1 h-full" ref={scrollAreaRef}>
             {/* Document Summary */}
-            <div className="p-8 border-b border-gray-200">
+            <div className="p-8 border-b border-border">
               <div className="max-w-4xl mx-auto">
                 <div className="flex items-center space-x-4 mb-6">
                   <div className="w-10 h-10 flex items-center justify-center bg-transparent">
-                    {isGenerating ? <Loader2 className="text-black font-normal w-10 h-10 animate-spin" /> : <span className="text-[40px] leading-none">{notebook?.icon || '☕'}</span>}
+                    {isGenerating ? <Loader2 className="text-foreground font-normal w-10 h-10 animate-spin" /> : <span className="text-[40px] leading-none">{notebook?.icon || '☕'}</span>}
                   </div>
                   <div>
-                    <h1 className="text-2xl font-medium text-gray-900">
-                      {isGenerating ? 'Generating content...' : notebook?.title || 'Untitled Notebook'}
+                    <h1 className="text-2xl font-medium text-foreground">
+                      {isGenerating ? 'Đang tạo nội dung...' : notebook?.title || 'Notebook chưa đặt tên'}
                     </h1>
-                    <p className="text-sm text-gray-600">{sourceCount} source{sourceCount !== 1 ? 's' : ''}</p>
+                    <p className="text-sm text-muted-foreground">{sourceCount} nguồn</p>
                   </div>
                 </div>
                 
-                <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                  {isGenerating ? <div className="flex items-center space-x-2 text-gray-600">
+                <div className="bg-muted/50 rounded-lg p-6 mb-6 px-4 py-4 md:px-6 md:py-6">
+                  {isGenerating ? <div className="flex items-center space-x-2 text-muted-foreground">
                       
-                      <p>AI is analyzing your source and generating a title and description...</p>
-                    </div> : <MarkdownRenderer content={notebook?.description || 'No description available for this notebook.'} className="prose prose-gray max-w-none text-gray-700 leading-relaxed" />}
+                      <p>AI đang phân tích nguồn và tạo tiêu đề, mô tả...</p>
+                    </div> : <MarkdownRenderer content={notebook?.description || 'Chưa có mô tả cho notebook này.'} className="prose prose-gray dark:prose-invert max-w-none leading-relaxed" />}
                 </div>
 
                 {/* Chat Messages */}
                 {(messages.length > 0 || pendingUserMessage || showAiLoading) && <div className="mb-6 space-y-4">
                     {messages.map((msg, index) => <div key={msg.id} className={`flex ${isUserMessage(msg) ? 'justify-end' : 'justify-start'}`}>
                         <div className={`${isUserMessage(msg) ? 'max-w-xs lg:max-w-md px-4 py-2 bg-blue-500 text-white rounded-lg' : 'w-full'}`}>
-                          <div className={isUserMessage(msg) ? '' : 'prose prose-gray max-w-none text-gray-800'}>
-                            <MarkdownRenderer content={msg.message.content} className={isUserMessage(msg) ? '' : ''} onCitationClick={handleCitationClick} isUserMessage={isUserMessage(msg)} />
+                          <div className={isUserMessage(msg) ? '' : 'prose prose-gray dark:prose-invert max-w-none text-foreground'}>
+                            <MarkdownRenderer content={msg.message.content} className={isUserMessage(msg) ? '' : ''} onCitationClick={handleCitationClick} selectedCitation={selectedCitation} isUserMessage={isUserMessage(msg)} />
                           </div>
                           {isAiMessage(msg) && <div className="mt-2 flex justify-start">
                               <SaveToNoteButton content={msg.message.content} notebookId={notebookId} />
@@ -224,32 +252,52 @@ const ChatArea = ({
                     
                     {/* AI Loading Indicator */}
                     {showAiLoading && <div className="flex justify-start" ref={latestMessageRef}>
-                        <div className="flex items-center space-x-2 px-4 py-3 bg-gray-100 rounded-lg">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{
-                    animationDelay: '0.1s'
-                  }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{
-                    animationDelay: '0.2s'
-                  }}></div>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2 px-4 py-3 bg-muted rounded-lg">
+                            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          </div>
+                          {showTimeout && (
+                            <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                              <span>Phản hồi đang mất nhiều thời gian hơn dự kiến...</span>
+                              <Button variant="outline" size="sm" className="ml-auto flex-shrink-0" onClick={handleRetry}>
+                                <RotateCcw className="h-3 w-3 mr-1" />
+                                Thử lại
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>}
+
+                    {/* Chat Error with Retry */}
+                    {chatError && <div className="flex justify-start" ref={!showAiLoading ? latestMessageRef : undefined}>
+                        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 max-w-md">
+                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                          <span>{chatError}</span>
+                          <Button variant="outline" size="sm" className="ml-auto flex-shrink-0 border-red-300 text-red-700 hover:bg-red-100" onClick={handleRetry}>
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                            Thử lại
+                          </Button>
                         </div>
                       </div>}
                     
                     {/* Scroll target for when no AI loading is shown */}
-                    {!showAiLoading && shouldShowScrollTarget() && <div ref={latestMessageRef} />}
+                    {!showAiLoading && !chatError && shouldShowScrollTarget() && <div ref={latestMessageRef} />}
                   </div>}
               </div>
             </div>
           </ScrollArea>
 
           {/* Chat Input - Fixed at bottom */}
-          <div className="p-6 border-t border-gray-200 flex-shrink-0">
+          <div className="p-6 border-t border-border flex-shrink-0">
             <div className="max-w-4xl mx-auto">
               <div className="flex space-x-4">
                 <div className="flex-1 relative">
                   <Input placeholder={getPlaceholderText()} value={message} onChange={e => setMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && !isChatDisabled && !isSending && !pendingUserMessage && handleSendMessage()} className="pr-12" disabled={isChatDisabled || isSending || !!pendingUserMessage} />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500">
-                    {sourceCount} source{sourceCount !== 1 ? 's' : ''}
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground">
+                    {sourceCount} nguồn
                   </div>
                 </div>
                 <Button onClick={() => handleSendMessage()} disabled={!message.trim() || isChatDisabled || isSending || !!pendingUserMessage}>
@@ -279,22 +327,22 @@ const ChatArea = ({
     // Empty State
     <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-hidden">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-gray-100">
-              <Upload className="h-8 w-8 text-slate-600" />
+            <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-muted">
+              <Upload className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h2 className="text-xl font-medium text-gray-900 mb-4">Add a source to get started</h2>
+            <h2 className="text-xl font-medium text-foreground mb-4">Thêm nguồn để bắt đầu</h2>
             <Button onClick={() => setShowAddSourcesDialog(true)}>
               <Upload className="h-4 w-4 mr-2" />
-              Upload a source
+              Tải nguồn lên
             </Button>
           </div>
 
           {/* Bottom Input */}
           <div className="w-full max-w-2xl">
             <div className="flex space-x-4">
-              <Input placeholder="Upload a source to get started" disabled className="flex-1" />
-              <div className="flex items-center text-sm text-gray-500">
-                0 sources
+              <Input placeholder="Tải nguồn lên để bắt đầu" disabled className="flex-1" />
+              <div className="flex items-center text-sm text-muted-foreground">
+                0 nguồn
               </div>
               <Button disabled>
                 <Send className="h-4 w-4" />
@@ -304,8 +352,8 @@ const ChatArea = ({
         </div>}
       
       {/* Footer */}
-      <div className="p-4 border-t border-gray-200 flex-shrink-0">
-        <p className="text-center text-sm text-gray-500">InsightsLM can be inaccurate; please double-check its responses.</p>
+      <div className="p-4 border-t border-border flex-shrink-0">
+        <p className="text-center text-sm text-muted-foreground">InsightsLM có thể không chính xác; vui lòng kiểm tra lại câu trả lời.</p>
       </div>
       
       {/* Add Sources Dialog */}

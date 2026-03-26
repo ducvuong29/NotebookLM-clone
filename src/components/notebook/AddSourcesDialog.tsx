@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Upload, FileText, Link, Copy } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 import MultipleWebsiteUrlsDialog from './MultipleWebsiteUrlsDialog';
 import CopiedTextDialog from './CopiedTextDialog';
 import { useSources } from '@/hooks/useSources';
@@ -16,6 +17,8 @@ interface AddSourcesDialogProps {
   onOpenChange: (open: boolean) => void;
   notebookId?: string;
 }
+
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB in bytes
 
 const AddSourcesDialog = ({
   open,
@@ -35,7 +38,10 @@ const AddSourcesDialog = ({
 
   const {
     uploadFile,
-    isUploading
+    isUploading,
+    uploadProgress,
+    uploadStatus,
+    resetProgress,
   } = useFileUpload();
 
   const {
@@ -52,12 +58,13 @@ const AddSourcesDialog = ({
     toast
   } = useToast();
 
-  // Reset local processing state when dialog opens
+  // Reset local processing state and upload progress when dialog opens
   useEffect(() => {
     if (open) {
       setIsLocallyProcessing(false);
+      resetProgress();
     }
-  }, [open]);
+  }, [open, resetProgress]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -86,89 +93,35 @@ const AddSourcesDialog = ({
     }
   }, []);
 
-  const processFileAsync = async (file: File, sourceId: string, notebookId: string) => {
-    try {
-      console.log('Starting file processing for:', file.name, 'source:', sourceId);
-      const fileType = file.type.includes('pdf') ? 'pdf' : file.type.includes('audio') ? 'audio' : 'text';
-
-      // Update status to uploading
-      updateSource({
-        sourceId,
-        updates: {
-          processing_status: 'uploading'
-        }
-      });
-
-      // Upload the file
-      const filePath = await uploadFile(file, notebookId, sourceId);
-      if (!filePath) {
-        throw new Error('File upload failed - no file path returned');
-      }
-      console.log('File uploaded successfully:', filePath);
-
-      // Update with file path and set to processing
-      updateSource({
-        sourceId,
-        updates: {
-          file_path: filePath,
-          processing_status: 'processing'
-        }
-      });
-
-      // Start document processing
-      try {
-        await processDocumentAsync({
-          sourceId,
-          filePath,
-          sourceType: fileType
-        });
-
-        // Generate notebook content
-        await generateNotebookContentAsync({
-          notebookId,
-          filePath,
-          sourceType: fileType
-        });
-        console.log('Document processing completed for:', sourceId);
-      } catch (processingError) {
-        console.error('Document processing failed:', processingError);
-
-        // Update to completed with basic info if processing fails
-        updateSource({
-          sourceId,
-          updates: {
-            processing_status: 'completed'
-          }
-        });
-      }
-    } catch (error) {
-      console.error('File processing failed for:', file.name, error);
-
-      // Update status to failed
-      updateSource({
-        sourceId,
-        updates: {
-          processing_status: 'failed'
-        }
-      });
-    }
-  };
-
   const handleFileUpload = async (files: File[]) => {
     if (!notebookId) {
       toast({
-        title: "Error",
-        description: "No notebook selected",
+        title: "Lỗi",
+        description: "Chưa chọn notebook",
         variant: "destructive"
       });
       return;
     }
 
-    console.log('Processing multiple files with delay strategy:', files.length);
+    // Validate file sizes — reject files > 25MB
+    const oversizedFiles = files.filter(f => f.size > MAX_FILE_SIZE);
+    const validFiles = files.filter(f => f.size <= MAX_FILE_SIZE);
+
+    oversizedFiles.forEach(f => {
+      toast({
+        title: "File quá lớn",
+        description: `"${f.name}" vượt quá giới hạn 25MB (${(f.size / 1024 / 1024).toFixed(1)}MB). Vui lòng chọn file nhỏ hơn.`,
+        variant: "destructive",
+      });
+    });
+
+    if (validFiles.length === 0) return;
+
+    files = validFiles;
     setIsLocallyProcessing(true);
 
     try {
-      // Step 1: Create the first source immediately (this will trigger generation if it's the first source)
+      // Step 1: Create the first source immediately
       const firstFile = files[0];
       const firstFileType = firstFile.type.includes('pdf') ? 'pdf' : firstFile.type.includes('audio') ? 'audio' : 'text';
       const firstSourceData = {
@@ -177,24 +130,18 @@ const AddSourcesDialog = ({
         type: firstFileType as 'pdf' | 'text' | 'website' | 'youtube' | 'audio',
         file_size: firstFile.size,
         processing_status: 'pending',
-        metadata: {
-          fileName: firstFile.name,
-          fileType: firstFile.type
-        }
+        metadata: { fileName: firstFile.name, fileType: firstFile.type }
       };
       
-      console.log('Creating first source for:', firstFile.name);
       const firstSource = await addSourceAsync(firstSourceData);
       
       let remainingSources = [];
       
-      // Step 2: If there are more files, add a delay before creating the rest
+      // Step 2: Create remaining sources
       if (files.length > 1) {
-        console.log('Adding 150ms delay before creating remaining sources...');
         await new Promise(resolve => setTimeout(resolve, 150));
         
-        // Create remaining sources
-        remainingSources = await Promise.all(files.slice(1).map(async (file, index) => {
+        remainingSources = await Promise.all(files.slice(1).map(async (file) => {
           const fileType = file.type.includes('pdf') ? 'pdf' : file.type.includes('audio') ? 'audio' : 'text';
           const sourceData = {
             notebookId,
@@ -202,60 +149,73 @@ const AddSourcesDialog = ({
             type: fileType as 'pdf' | 'text' | 'website' | 'youtube' | 'audio',
             file_size: file.size,
             processing_status: 'pending',
-            metadata: {
-              fileName: file.name,
-              fileType: file.type
-            }
+            metadata: { fileName: file.name, fileType: file.type }
           };
-          console.log('Creating source for:', file.name);
           return await addSourceAsync(sourceData);
         }));
-        
-        console.log('Remaining sources created:', remainingSources.length);
       }
 
-      // Combine all created sources
       const allCreatedSources = [firstSource, ...remainingSources];
 
-      console.log('All sources created successfully:', allCreatedSources.length);
+      // Step 3: Upload all files concurrently
+      const uploadPromises = files.map((file, index) => {
+        const sourceId = allCreatedSources[index].id;
+        updateSource({ sourceId, updates: { processing_status: 'uploading' } });
+        return uploadFile(file, notebookId, sourceId).then(filePath => {
+          if (!filePath) throw new Error('File upload failed - no file path returned');
+          return { file, sourceId, filePath };
+        }).catch(err => {
+          updateSource({ sourceId, updates: { processing_status: 'failed' } });
+          throw err;
+        });
+      });
 
-      // Step 3: Close dialog immediately
+      const uploadResults = await Promise.all(uploadPromises);
+
+      // Wait 1s to let users see the 100% success progress bar before closing
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Step 4: Close dialog immediately after upload completes
       setIsLocallyProcessing(false);
       onOpenChange(false);
 
-      // Step 4: Show success toast
       toast({
-        title: "Files Added",
-        description: `${files.length} file${files.length > 1 ? 's' : ''} added and processing started`
+        title: "Đã thêm file",
+        description: `${files.length} file đã tải lên và đang được xử lý`
       });
 
-      // Step 5: Process files in parallel (background)
-      const processingPromises = files.map((file, index) => processFileAsync(file, allCreatedSources[index].id, notebookId));
-
-      // Don't await - let processing happen in background
-      Promise.allSettled(processingPromises).then(results => {
-        const successful = results.filter(r => r.status === 'fulfilled').length;
-        const failed = results.filter(r => r.status === 'rejected').length;
-
-        console.log('File processing completed:', {
-          successful,
-          failed
+      // Step 5: Process files in background
+      const processingPromises = uploadResults.map(({ file, sourceId, filePath }) => {
+        const fileType = file.type.includes('pdf') ? 'pdf' : file.type.includes('audio') ? 'audio' : 'text';
+        
+        updateSource({
+          sourceId,
+          updates: { file_path: filePath, processing_status: 'processing' }
         });
 
+        return processDocumentAsync({ sourceId, filePath, sourceType: fileType })
+          .then(() => generateNotebookContentAsync({ notebookId, filePath, sourceType: fileType }))
+          .catch(processingError => {
+            updateSource({ sourceId, updates: { processing_status: 'completed' } });
+            throw processingError;
+          });
+      });
+
+      Promise.allSettled(processingPromises).then(results => {
+        const failed = results.filter(r => r.status === 'rejected').length;
         if (failed > 0) {
           toast({
-            title: "Processing Issues",
-            description: `${failed} file${failed > 1 ? 's' : ''} had processing issues. Check the sources list for details.`,
+            title: "Lỗi xử lý",
+            description: `${failed} file gặp sự cố khi xử lý. Kiểm tra danh sách nguồn để biết chi tiết.`,
             variant: "destructive"
           });
         }
       });
     } catch (error) {
-      console.error('Error creating sources:', error);
       setIsLocallyProcessing(false);
       toast({
-        title: "Error",
-        description: "Failed to add files. Please try again.",
+        title: "Lỗi",
+        description: "Không thể tải lên file. Vui lòng thử lại.",
         variant: "destructive"
       });
     }
@@ -296,14 +256,14 @@ const AddSourcesDialog = ({
       }
 
       toast({
-        title: "Success",
-        description: "Text has been added and sent for processing"
+        title: "Thành công",
+        description: "Văn bản đã được thêm và gửi để xử lý"
       });
     } catch (error) {
       console.error('Error adding text source:', error);
       toast({
-        title: "Error",
-        description: "Failed to add text source",
+        title: "Lỗi",
+        description: "Không thể thêm văn bản",
         variant: "destructive"
       });
     } finally {
@@ -379,16 +339,16 @@ const AddSourcesDialog = ({
       }
 
       toast({
-        title: "Success",
-        description: `${urls.length} website${urls.length > 1 ? 's' : ''} added and sent for processing`
+        title: "Thành công",
+        description: `${urls.length} website đã được thêm và gửi để xử lý`
       });
 
       onOpenChange(false);
     } catch (error) {
       console.error('Error adding multiple websites:', error);
       toast({
-        title: "Error",
-        description: "Failed to add websites",
+        title: "Lỗi",
+        description: "Không thể thêm website",
         variant: "destructive"
       });
     } finally {
@@ -418,10 +378,10 @@ const AddSourcesDialog = ({
 
           <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-medium mb-2">Add sources</h2>
-              <p className="text-gray-600 text-sm mb-1">Sources let InsightsLM base its responses on the information that matters most to you.</p>
+              <h2 className="text-xl font-medium mb-2">Thêm nguồn</h2>
+              <p className="text-gray-600 text-sm mb-1">Nguồn tài liệu giúp InsightsLM dựa trên thông tin quan trọng nhất với bạn để trả lời.</p>
               <p className="text-gray-500 text-xs">
-                (Examples: marketing plans, course reading, research notes, meeting transcripts, sales documents, etc.)
+                (Ví dụ: kế hoạch marketing, tài liệu học tập, ghi chú nghiên cứu, biên bản họp, tài liệu bán hàng, v.v.)
               </p>
             </div>
 
@@ -440,29 +400,29 @@ const AddSourcesDialog = ({
                   <Upload className="h-6 w-6 text-slate-600" />
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-2">
-                    {isProcessingFiles ? 'Processing files...' : 'Upload sources'}
+                  <h3 className="font-medium text-foreground mb-2">
+                    {isProcessingFiles ? 'Đang xử lý file...' : 'Tải nguồn lên'}
                   </h3>
                   <p className="text-gray-600 text-sm">
                     {isProcessingFiles ? (
-                      'Please wait while we process your files'
+                      'Vui lòng chờ trong khi chúng tôi xử lý file'
                     ) : (
                       <>
-                        Drag & drop or{' '}
+                        Kéo thả hoặc{' '}
                         <button 
                           className="text-blue-600 hover:underline" 
                           onClick={() => document.getElementById('file-upload')?.click()}
                           disabled={isProcessingFiles}
                         >
-                          choose file
+                          chọn file
                         </button>{' '}
-                        to upload
+                        để tải lên
                       </>
                     )}
                   </p>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Supported file types: PDF, txt, Markdown, Audio (e.g. mp3)
+                  Định dạng hỗ trợ: PDF, txt, Markdown, Âm thanh (ví dụ: mp3) · Tối đa 25MB mỗi file
                 </p>
                 <input
                   id="file-upload"
@@ -476,6 +436,29 @@ const AddSourcesDialog = ({
               </div>
             </div>
 
+            {/* Upload Progress Bar */}
+            {uploadStatus !== 'idle' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">
+                    {uploadStatus === 'uploading' && `Đang tải lên... ${uploadProgress}%`}
+                    {uploadStatus === 'success' && 'Tải lên hoàn tất! ✅'}
+                    {uploadStatus === 'error' && 'Tải lên thất bại ❌'}
+                  </span>
+                </div>
+                <Progress
+                  value={uploadProgress}
+                  className={`h-2 ${
+                    uploadStatus === 'error'
+                      ? '[&>div]:bg-red-500'
+                      : uploadStatus === 'success'
+                        ? '[&>div]:bg-green-500'
+                        : '[&>div]:bg-amber-500'
+                  }`}
+                />
+              </div>
+            )}
+
             {/* Integration Options */}
             <div className="grid grid-cols-2 gap-4">
               <Button
@@ -485,8 +468,8 @@ const AddSourcesDialog = ({
                 disabled={isProcessingFiles}
               >
                 <Link className="h-6 w-6 text-green-600" />
-                <span className="font-medium">Link - Website</span>
-                <span className="text-sm text-gray-500">Multiple URLs at once</span>
+                <span className="font-medium">Liên kết - Website</span>
+                <span className="text-sm text-gray-500">Nhiều URL cùng lúc</span>
               </Button>
 
               <Button
@@ -496,8 +479,8 @@ const AddSourcesDialog = ({
                 disabled={isProcessingFiles}
               >
                 <Copy className="h-6 w-6 text-purple-600" />
-                <span className="font-medium">Paste Text - Copied Text</span>
-                <span className="text-sm text-gray-500">Add copied content</span>
+                <span className="font-medium">Dán văn bản</span>
+                <span className="text-sm text-gray-500">Thêm nội dung đã sao chép</span>
               </Button>
             </div>
           </div>

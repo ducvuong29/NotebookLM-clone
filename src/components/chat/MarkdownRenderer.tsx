@@ -7,15 +7,16 @@ interface MarkdownRendererProps {
   content: string | { segments: MessageSegment[]; citations: Citation[] };
   className?: string;
   onCitationClick?: (citation: Citation) => void;
+  selectedCitation?: Citation | null;
   isUserMessage?: boolean;
 }
 
-const MarkdownRenderer = ({ content, className = '', onCitationClick, isUserMessage = false }: MarkdownRendererProps) => {
+const MarkdownRenderer = ({ content, className = '', onCitationClick, selectedCitation, isUserMessage = false }: MarkdownRendererProps) => {
   // Handle enhanced content with citations
   if (typeof content === 'object' && 'segments' in content) {
     return (
       <div className={className}>
-        {processMarkdownWithCitations(content.segments, content.citations, onCitationClick, isUserMessage)}
+        {processMarkdownWithCitations(content.segments, content.citations, onCitationClick, selectedCitation, isUserMessage)}
       </div>
     );
   }
@@ -26,7 +27,7 @@ const MarkdownRenderer = ({ content, className = '', onCitationClick, isUserMess
   
   return (
     <div className={className}>
-      {processMarkdownWithCitations(segments, citations, onCitationClick, isUserMessage)}
+      {processMarkdownWithCitations(segments, citations, onCitationClick, selectedCitation, isUserMessage)}
     </div>
   );
 };
@@ -36,6 +37,7 @@ const processMarkdownWithCitations = (
   segments: MessageSegment[], 
   citations: Citation[], 
   onCitationClick?: (citation: Citation) => void,
+  selectedCitation?: Citation | null,
   isUserMessage: boolean = false
 ) => {
   // For user messages, render as inline content without paragraph breaks
@@ -45,20 +47,17 @@ const processMarkdownWithCitations = (
         {segments.map((segment, index) => (
           <span key={index}>
             {processInlineMarkdown(segment.text)}
-            {segment.citation_id && onCitationClick && (
-              <CitationButton
-                chunkIndex={(() => {
-                  const citation = citations.find(c => c.citation_id === segment.citation_id);
-                  return citation?.chunk_index || 0;
-                })()}
-                onClick={() => {
-                  const citation = citations.find(c => c.citation_id === segment.citation_id);
-                  if (citation) {
-                    onCitationClick(citation);
-                  }
-                }}
-              />
-            )}
+            {segment.citation_id && onCitationClick && (() => {
+              const citation = citations.find(c => c.citation_id === segment.citation_id);
+              if (!citation) return null;
+              return (
+                <CitationButton
+                  chunkIndex={citation.chunk_index || 0}
+                  onClick={() => onCitationClick(citation)}
+                  isActive={selectedCitation?.citation_id === citation.citation_id}
+                />
+              );
+            })()}
           </span>
         ))}
       </span>
@@ -86,6 +85,7 @@ const processMarkdownWithCitations = (
             <CitationButton
               chunkIndex={citation.chunk_index || 0}
               onClick={() => onCitationClick(citation)}
+              isActive={selectedCitation?.citation_id === citation.citation_id}
             />
           )}
         </p>

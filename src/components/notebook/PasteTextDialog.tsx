@@ -29,7 +29,7 @@ const PasteTextDialog = ({ open, onOpenChange, onSubmit }: PasteTextDialogProps)
 
     setIsLoading(true);
     try {
-      await onSubmit(title.trim() || 'Pasted Text', content.trim());
+      await onSubmit(title.trim() || 'Văn bản dán', content.trim());
       setTitle('');
       setContent('');
       onOpenChange(false);
@@ -55,16 +55,16 @@ const PasteTextDialog = ({ open, onOpenChange, onSubmit }: PasteTextDialogProps)
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <Copy className="h-5 w-5 text-gray-600" />
-            <span>Add Text Source</span>
+            <span>Thêm văn bản</span>
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="text-title">Title (optional)</Label>
+            <Label htmlFor="text-title">Tiêu đề (không bắt buộc)</Label>
             <Input
               id="text-title"
-              placeholder="Enter a title for this text..."
+              placeholder="Nhập tiêu đề cho văn bản..."
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -72,7 +72,7 @@ const PasteTextDialog = ({ open, onOpenChange, onSubmit }: PasteTextDialogProps)
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="text-content">Content</Label>
+              <Label htmlFor="text-content">Nội dung</Label>
               <Button
                 type="button"
                 variant="outline"
@@ -80,12 +80,12 @@ const PasteTextDialog = ({ open, onOpenChange, onSubmit }: PasteTextDialogProps)
                 onClick={handlePasteFromClipboard}
               >
                 <Copy className="h-4 w-4 mr-2" />
-                Paste from clipboard
+                Dán từ clipboard
               </Button>
             </div>
             <Textarea
               id="text-content"
-              placeholder="Paste or type your text here..."
+              placeholder="Dán hoặc nhập văn bản tại đây..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={12}
@@ -93,7 +93,7 @@ const PasteTextDialog = ({ open, onOpenChange, onSubmit }: PasteTextDialogProps)
               className="min-h-[300px]"
             />
             <p className="text-xs text-gray-500">
-              {content.length} characters
+              {content.length} ký tự
             </p>
           </div>
 
@@ -104,14 +104,14 @@ const PasteTextDialog = ({ open, onOpenChange, onSubmit }: PasteTextDialogProps)
               className="flex-1"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              Hủy
             </Button>
             <Button
               type="submit"
               className="flex-1"
               disabled={!content.trim() || isLoading}
             >
-              {isLoading ? 'Adding...' : 'Add Source'}
+              {isLoading ? 'Đang thêm...' : 'Thêm nguồn'}
             </Button>
           </div>
         </form>

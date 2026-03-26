@@ -38,16 +38,16 @@ export const useNotebookGeneration = () => {
       queryClient.invalidateQueries({ queryKey: ['notebook'] });
       
       toast({
-        title: "Content Generated",
-        description: "Notebook title and description have been generated successfully.",
+        title: "Đã tạo nội dung",
+        description: "Tiêu đề và mô tả notebook đã được tạo thành công.",
       });
     },
     onError: (error) => {
       console.error('Notebook generation failed:', error);
       
       toast({
-        title: "Generation Failed",
-        description: "Failed to generate notebook content. Please try again.",
+        title: "Tạo thất bại",
+        description: "Không thể tạo nội dung notebook. Vui lòng thử lại.",
         variant: "destructive",
       });
     },

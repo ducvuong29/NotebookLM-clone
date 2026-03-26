@@ -35,8 +35,8 @@ export const useAudioOverview = (notebookId?: string) => {
             if (newData.audio_overview_generation_status === 'completed' && newData.audio_overview_url) {
               setIsGenerating(false);
               toast({
-                title: "Audio Overview Ready!",
-                description: "Your deep dive conversation is ready to play!",
+                title: "Tổng quan Âm thanh đã sẵn sàng!",
+                description: "Cuộc trò chuyện chuyên sâu đã sẵn sàng để phát!",
               });
               
               // Invalidate queries to refresh the UI
@@ -44,8 +44,8 @@ export const useAudioOverview = (notebookId?: string) => {
             } else if (newData.audio_overview_generation_status === 'failed') {
               setIsGenerating(false);
               toast({
-                title: "Generation Failed",
-                description: "Failed to generate audio overview. Please try again.",
+                title: "Tạo thất bại",
+                description: "Không thể tạo tổng quan âm thanh. Vui lòng thử lại.",
                 variant: "destructive",
               });
             }
@@ -84,8 +84,8 @@ export const useAudioOverview = (notebookId?: string) => {
       setGenerationStatus(null);
       
       toast({
-        title: "Failed to Start Generation",
-        description: error.message || "Failed to start audio generation. Please try again.",
+        title: "Không thể bắt đầu tạo",
+        description: error.message || "Không thể bắt đầu tạo âm thanh. Vui lòng thử lại.",
         variant: "destructive",
       });
     }
@@ -122,8 +122,8 @@ export const useAudioOverview = (notebookId?: string) => {
       if (!variables.silent) {
         setIsAutoRefreshing(false);
         toast({
-          title: "Failed to Refresh URL",
-          description: "Unable to refresh the audio URL. Please try again.",
+          title: "Không thể làm mới URL",
+          description: "Không thể làm mới URL âm thanh. Vui lòng thử lại.",
           variant: "destructive",
         });
       }

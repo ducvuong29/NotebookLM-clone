@@ -25,20 +25,7 @@ dist-ssr
 .env.example
 .gitnexus
 
-# AI Agent & Workflow directories
-.agent/
-.agents/
-.claude/
-.serena/
-_bmad/
-_bmad-output/
-design-artifacts/
-temp_n8n_query/
 
-# AI Agent docs/configs
-AGENTS.md
-AGENTS_GUIDE.md
-CLAUDE.md
 
 # Application Database Files
 n8n_db.sqlite*
@@ -46,3 +33,34 @@ n8n_db.sqlite*
 # Secrets
 .env
 .roo/
+
+# AI configs, Agents and skills
+.agent/
+.agents/
+_agent/
+_agents/
+_bmad/
+_bmad-output/
+.claude/
+.cline/
+.serena/
+AGENTS.md
+AGENTS_GUIDE.md
+CLAUDE.md
+skills-lock.json
+
+# Temp & Debug files
+temp_*.txt
+patch-supabase.js
+query_schema.js
+push_error.txt
+errors.json
+thumb.jpg
+n8n/
+temp_n8n_query/
+
+# Testing
+playwright-report/
+test-results/
+pw-output*.log
+test-*.log

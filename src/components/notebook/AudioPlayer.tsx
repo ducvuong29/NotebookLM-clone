@@ -19,7 +19,7 @@ interface AudioPlayerProps {
 
 const AudioPlayer = ({ 
   audioUrl, 
-  title = "Deep Dive Conversation", 
+  title = "Cuộc trò chuyện chuyên sâu", 
   notebookId,
   expiresAt,
   onError,
@@ -77,7 +77,7 @@ const AudioPlayer = ({
           audio.load();
         }, 1000 * (retryCount + 1)); // Exponential backoff
       } else {
-        setAudioError('Failed to load audio');
+        setAudioError('Không thể tải âm thanh');
         setAutoRetryInProgress(false);
         onError?.();
       }
@@ -133,7 +133,7 @@ const AudioPlayer = ({
       if (playPromise !== undefined) {
         playPromise.catch(error => {
           console.error('Play failed:', error);
-          setAudioError('Playback failed');
+          setAudioError('Phát lại thất bại');
         });
       }
     }
@@ -211,14 +211,14 @@ const AudioPlayer = ({
       URL.revokeObjectURL(blobUrl);
       
       toast({
-        title: "Download Started",
-        description: "Your audio file is being downloaded.",
+        title: "Bắt đầu tải xuống",
+        description: "File âm thanh đang được tải xuống.",
       });
     } catch (error) {
       console.error('Download failed:', error);
       toast({
-        title: "Download Failed",
-        description: "Failed to download the audio file. Please try again.",
+        title: "Tải xuống thất bại",
+        description: "Không thể tải file âm thanh. Vui lòng thử lại.",
         variant: "destructive",
       });
     } finally {
@@ -229,8 +229,8 @@ const AudioPlayer = ({
   const deleteAudio = async () => {
     if (!notebookId) {
       toast({
-        title: "Error",
-        description: "Cannot delete audio - notebook ID not found",
+        title: "Lỗi",
+        description: "Không thể xóa âm thanh - không tìm thấy notebook",
         variant: "destructive",
       });
       return;
@@ -288,8 +288,8 @@ const AudioPlayer = ({
       }
 
       toast({
-        title: "Audio Deleted",
-        description: "The audio overview and associated files have been successfully deleted.",
+        title: "Đã xóa âm thanh",
+        description: "Tổng quan âm thanh và các file liên quan đã được xóa thành công.",
       });
 
       // Call the onDeleted callback to update parent component
@@ -298,8 +298,8 @@ const AudioPlayer = ({
     } catch (error) {
       console.error('Failed to delete audio:', error);
       toast({
-        title: "Delete Failed",
-        description: "Failed to delete the audio overview. Please try again.",
+        title: "Xóa thất bại",
+        description: "Không thể xóa tổng quan âm thanh. Vui lòng thử lại.",
         variant: "destructive",
       });
     } finally {
@@ -313,7 +313,7 @@ const AudioPlayer = ({
       
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <h4 className="font-medium text-gray-900">{title}</h4>
+          <h4 className="font-medium text-foreground">{title}</h4>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -332,7 +332,7 @@ const AudioPlayer = ({
               ) : (
                 <Download className="h-4 w-4 mr-2" />
               )}
-              {isDownloading ? 'Downloading...' : 'Download'}
+              {isDownloading ? 'Đang tải...' : 'Tải xuống'}
             </DropdownMenuItem>
             <DropdownMenuItem 
               onClick={deleteAudio}
@@ -340,7 +340,7 @@ const AudioPlayer = ({
               disabled={isDeleting}
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Delete
+              Xóa
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -351,7 +351,7 @@ const AudioPlayer = ({
         <div className="flex items-center justify-between p-3 bg-blue-50 rounded-md border border-blue-200">
           <div className="flex items-center space-x-2">
             <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
-            <span className="text-sm text-blue-600">Refreshing audio access...</span>
+            <span className="text-sm text-blue-600">Đang làm mới quyền truy cập âm thanh...</span>
           </div>
         </div>
       )}
@@ -370,7 +370,7 @@ const AudioPlayer = ({
             className="text-red-600 border-red-300 hover:bg-red-50"
           >
             <RefreshCw className="h-4 w-4 mr-1" />
-            Retry
+            Thử lại
           </Button>
         </div>
       )}

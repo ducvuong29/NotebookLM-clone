@@ -32,15 +32,15 @@ export const useSourceUpdate = () => {
       console.log('Update mutation success, invalidating queries');
       queryClient.invalidateQueries({ queryKey: ['sources'] });
       toast({
-        title: "Source renamed",
-        description: "The source has been successfully renamed.",
+        title: "Đã đổi tên nguồn",
+        description: "Nguồn đã được đổi tên thành công.",
       });
     },
     onError: (error) => {
       console.error('Update mutation error:', error);
       toast({
-        title: "Error",
-        description: "Failed to rename the source. Please try again.",
+        title: "Lỗi",
+        description: "Không thể đổi tên nguồn. Vui lòng thử lại.",
         variant: "destructive",
       });
     },

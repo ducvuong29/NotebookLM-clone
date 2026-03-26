@@ -51,31 +51,31 @@ const RenameSourceDialog = ({ open, onOpenChange, source, notebookId }: RenameSo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Rename {source?.title}?</DialogTitle>
+          <DialogTitle>Đổi tên {source?.title}?</DialogTitle>
           <DialogDescription>
-            Enter a new name for this source.
+            Nhập tên mới cho nguồn này.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="source-name">Source Name *</Label>
+            <Label htmlFor="source-name">Tên nguồn *</Label>
             <Input
               id="source-name"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter source name"
+              placeholder="Nhập tên nguồn"
             />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={handleCancel}>
-            Cancel
+            Hủy
           </Button>
           <Button 
             onClick={handleSave}
             disabled={!title.trim() || isUpdating}
           >
-            {isUpdating ? 'Saving...' : 'Save'}
+            {isUpdating ? 'Đang lưu...' : 'Lưu'}
           </Button>
         </DialogFooter>
       </DialogContent>

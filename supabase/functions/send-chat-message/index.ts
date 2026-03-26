@@ -63,20 +63,38 @@ serve(async (req) => {
 
     console.log('Sending to webhook with auth header');
 
-    // Send message to n8n webhook with authentication
-    const webhookResponse = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': webhookAuthHeader,
-      },
-      body: JSON.stringify({
-        session_id,
-        message,
-        user_id,
-        timestamp: new Date().toISOString()
-      })
-    });
+    // Send message to n8n webhook with 25s timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+    let webhookResponse: Response;
+    try {
+      webhookResponse = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': webhookAuthHeader,
+        },
+        body: JSON.stringify({
+          session_id,
+          message,
+          user_id,
+          timestamp: new Date().toISOString()
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+    } catch (fetchError: unknown) {
+      clearTimeout(timeoutId);
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        console.error('Webhook request timed out after 25s');
+        return new Response(
+          JSON.stringify({ error: true, code: 'TIMEOUT', message: 'Chat request timed out' }),
+          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw fetchError;
+    }
 
     if (!webhookResponse.ok) {
       console.error(`Webhook responded with status: ${webhookResponse.status}`);
@@ -101,9 +119,11 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in send-chat-message:', error);
     
+    const errMsg = error instanceof Error ? error.message : 'Failed to send message to webhook';
+    
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Failed to send message to webhook' 
+        error: errMsg 
       }),
       { 
         status: 500,

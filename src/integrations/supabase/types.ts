@@ -63,6 +63,7 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          visibility: string
         }
         Insert: {
           audio_overview_generation_status?: string | null
@@ -78,6 +79,7 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
+          visibility?: string
         }
         Update: {
           audio_overview_generation_status?: string | null
@@ -93,6 +95,7 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          visibility?: string
         }
         Relationships: [
           {
@@ -152,6 +155,7 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
+          role: string | null
           updated_at: string
         }
         Insert: {
@@ -160,6 +164,7 @@ export type Database = {
           email: string
           full_name?: string | null
           id: string
+          role?: string | null
           updated_at?: string
         }
         Update: {
@@ -168,6 +173,7 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          role?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -243,6 +249,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown

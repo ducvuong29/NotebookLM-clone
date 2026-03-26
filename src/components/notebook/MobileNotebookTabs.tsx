@@ -22,6 +22,8 @@ interface MobileNotebookTabsProps {
   onCitationClose?: () => void;
   setSelectedCitation?: (citation: Citation | null) => void;
   onCitationClick?: (citation: Citation) => void;
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
 }
 
 const MobileNotebookTabs = ({
@@ -31,28 +33,30 @@ const MobileNotebookTabs = ({
   selectedCitation,
   onCitationClose,
   setSelectedCitation,
-  onCitationClick
+  onCitationClick,
+  activeTab = 'chat',
+  setActiveTab
 }: MobileNotebookTabsProps) => {
   return (
-    <Tabs defaultValue="chat" className="flex-1 flex flex-col overflow-hidden">
+    <Tabs value={activeTab} onValueChange={(value) => setActiveTab?.(value)} className="flex-1 flex flex-col overflow-hidden">
       <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 h-12 rounded-none border-b border-gray-200">
         <TabsTrigger 
           value="sources" 
-          className="flex items-center space-x-2 text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+          className="flex items-center space-x-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
         >
           <FileText className="h-4 w-4" />
           <span className="hidden sm:inline">Sources</span>
         </TabsTrigger>
         <TabsTrigger 
           value="chat" 
-          className="flex items-center space-x-2 text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+          className="flex items-center space-x-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
         >
           <MessageCircle className="h-4 w-4" />
           <span className="hidden sm:inline">Chat</span>
         </TabsTrigger>
         <TabsTrigger 
           value="studio" 
-          className="flex items-center space-x-2 text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+          className="flex items-center space-x-2 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
         >
           <NotebookPen className="h-4 w-4" />
           <span className="hidden sm:inline">Notes</span>
@@ -75,6 +79,7 @@ const MobileNotebookTabs = ({
           notebookId={notebookId}
           notebook={notebook}
           onCitationClick={onCitationClick}
+          selectedCitation={selectedCitation}
         />
       </TabsContent>
 

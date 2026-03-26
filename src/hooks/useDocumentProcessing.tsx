@@ -39,8 +39,8 @@ export const useDocumentProcessing = () => {
     onError: (error) => {
       console.error('Failed to initiate document processing:', error);
       toast({
-        title: "Processing Error",
-        description: "Failed to start document processing. Please try again.",
+        title: "Lỗi xử lý",
+        description: "Không thể bắt đầu xử lý tài liệu. Vui lòng thử lại.",
         variant: "destructive",
       });
     },

@@ -23,18 +23,29 @@ const NotebookGrid = () => {
   } = useNotebooks();
   const navigate = useNavigate();
 
-  const sortedNotebooks = useMemo(() => {
+  const formattedNotebooks = useMemo(() => {
     if (!notebooks) return [];
     
     const sorted = [...notebooks];
     
     if (sortBy === 'Most recent') {
-      return sorted.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      sorted.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
     } else if (sortBy === 'Title') {
-      return sorted.sort((a, b) => a.title.localeCompare(b.title));
+      sorted.sort((a, b) => a.title.localeCompare(b.title));
     }
     
-    return sorted;
+    return sorted.map(notebook => ({
+      id: notebook.id,
+      title: notebook.title,
+      date: new Date(notebook.updated_at).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      }),
+      sources: notebook.sources?.[0]?.count || 0,
+      icon: notebook.icon || '📝',
+      color: notebook.color || 'bg-gray-100'
+    }));
   }, [notebooks, sortBy]);
 
   const handleCreateNotebook = () => {
@@ -71,16 +82,16 @@ const NotebookGrid = () => {
 
   return <div>
       <div className="flex items-center justify-between mb-8">
-        <Button className="bg-black hover:bg-gray-800 text-white rounded-full px-6" onClick={handleCreateNotebook} disabled={isCreating}>
+        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6" onClick={handleCreateNotebook} disabled={isCreating}>
           {isCreating ? 'Creating...' : '+ Create new'}
         </Button>
         
         <div className="flex items-center space-x-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <div className="flex items-center space-x-2 bg-white rounded-lg border px-3 py-2 cursor-pointer hover:bg-gray-50 transition-colors">
-                <span className="text-sm text-gray-600">{sortBy}</span>
-                <ChevronDown className="h-4 w-4 text-gray-400" />
+              <div className="flex items-center space-x-2 bg-background rounded-lg border border-border px-3 py-2 cursor-pointer hover:bg-muted transition-colors">
+                <span className="text-sm text-muted-foreground">{sortBy}</span>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -97,21 +108,12 @@ const NotebookGrid = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {sortedNotebooks.map(notebook => <div key={notebook.id} onClick={e => handleNotebookClick(notebook.id, e)}>
-            <NotebookCard notebook={{
-          id: notebook.id,
-          title: notebook.title,
-          date: new Date(notebook.updated_at).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-          }),
-          sources: notebook.sources?.[0]?.count || 0,
-          icon: notebook.icon || '📝',
-          color: notebook.color || 'bg-gray-100'
-        }} />
-          </div>)}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {formattedNotebooks.map(notebook => (
+          <div key={notebook.id} onClick={e => handleNotebookClick(notebook.id, e)} className="h-full">
+            <NotebookCard notebook={notebook} />
+          </div>
+        ))}
       </div>
     </div>;
 };

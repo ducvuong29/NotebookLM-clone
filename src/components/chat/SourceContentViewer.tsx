@@ -1,7 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { Citation } from '@/types/message';
 import {
   Accordion,
@@ -30,96 +29,48 @@ const SourceContentViewer = ({
   const highlightedContentRef = useRef<HTMLDivElement>(null);
   const scrollAreaViewportRef = useRef<HTMLDivElement>(null);
   
-  // Control accordion state based on how the viewer was opened
+  /** Accordion defaults open when browsing the source list, closed when jumping from a citation */
   const [accordionValue, setAccordionValue] = useState<string>(
     isOpenedFromSourceList ? "guide" : ""
   );
 
-  // Check if we have valid citation line data (indicating a real citation click)
   const hasValidCitationLines = citation && 
     typeof citation.chunk_lines_from === 'number' && 
     typeof citation.chunk_lines_to === 'number' &&
     citation.chunk_lines_from > 0;
 
-  console.log('SourceContentViewer: Render with citation', {
-    citationId: citation?.citation_id,
-    sourceId: citation?.source_id,
-    hasValidCitationLines,
-    isOpenedFromSourceList,
-    chunkLinesFrom: citation?.chunk_lines_from,
-    chunkLinesTo: citation?.chunk_lines_to
-  });
-
-  // Auto-scroll to highlighted content when citation changes and has valid line data
+  // ── Auto-scroll to the highlighted passage ──────────────────────────
   useEffect(() => {
-    console.log('SourceContentViewer: Auto-scroll effect triggered', {
-      hasValidCitationLines,
-      citationId: citation?.citation_id,
-      hasHighlightedRef: !!highlightedContentRef.current,
-      hasScrollAreaRef: !!scrollAreaViewportRef.current
+    if (!hasValidCitationLines) return;
+
+    // Use requestAnimationFrame to wait for the DOM paint, then scroll
+    const frameId = requestAnimationFrame(() => {
+      highlightedContentRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
     });
 
-    if (hasValidCitationLines && highlightedContentRef.current && scrollAreaViewportRef.current) {
-      console.log('SourceContentViewer: Starting auto-scroll process');
-      
-      // Increased delay to ensure DOM has fully updated
-      const timer = setTimeout(() => {
-        if (highlightedContentRef.current && scrollAreaViewportRef.current) {
-          console.log('SourceContentViewer: Executing auto-scroll');
-          
-          // Find the actual viewport element within the ScrollArea
-          const scrollAreaElement = scrollAreaViewportRef.current;
-          const viewport = scrollAreaElement.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
-          
-          if (viewport && highlightedContentRef.current) {
-            const highlightedElement = highlightedContentRef.current;
-            
-            console.log('SourceContentViewer: Scroll calculation', {
-              highlightedOffsetTop: highlightedElement.offsetTop,
-              highlightedHeight: highlightedElement.clientHeight,
-              viewportHeight: viewport.clientHeight,
-              currentScrollTop: viewport.scrollTop
-            });
-            
-            // Calculate the scroll position to center the highlighted content
-            const scrollTop = highlightedElement.offsetTop - (viewport.clientHeight / 2) + (highlightedElement.clientHeight / 2);
-            const targetScrollTop = Math.max(0, scrollTop);
-            
-            console.log('SourceContentViewer: Scrolling to position', { targetScrollTop });
-            
-            viewport.scrollTo({
-              top: targetScrollTop,
-              behavior: 'smooth'
-            });
-          } else {
-            console.log('SourceContentViewer: Viewport or highlighted element not found', {
-              viewport: !!viewport,
-              highlightedElement: !!highlightedContentRef.current
-            });
-          }
-        }
-      }, 300); // Increased delay for better reliability
-
-      return () => clearTimeout(timer);
-    }
+    return () => cancelAnimationFrame(frameId);
   }, [citation?.citation_id, citation?.chunk_lines_from, citation?.chunk_lines_to, citation?.source_id, hasValidCitationLines]);
 
-  // Close guide when a real citation is clicked (has valid line data)
+  // ── Collapse the guide accordion when a real citation is clicked ────
   useEffect(() => {
     if (hasValidCitationLines) {
-      console.log('SourceContentViewer: Closing guide for real citation');
       setAccordionValue("");
     }
   }, [hasValidCitationLines]);
 
+  // ── Empty state ─────────────────────────────────────────────────────
   if (!citation || !sourceContent) {
     return (
-      <div className="p-4 text-center text-gray-500">
-        <p className="text-sm">Select a citation to view source content</p>
+      <div className="p-4 text-center text-muted-foreground">
+        <p className="text-sm">Nhấn vào trích dẫn để xem nội dung nguồn</p>
       </div>
     );
   }
 
+  // ── Source type icon helper ─────────────────────────────────────────
   const getSourceIcon = (type: string) => {
     const iconMap: Record<string, string> = {
       'pdf': '/file-types/PDF.svg',
@@ -132,7 +83,7 @@ const SourceContentViewer = ({
       'copied-text': '/file-types/TXT.png'
     };
 
-    const iconUrl = iconMap[type] || iconMap['text']; // fallback to TXT icon
+    const iconUrl = iconMap[type] || iconMap['text'];
     
     return (
       <img 
@@ -140,33 +91,19 @@ const SourceContentViewer = ({
         alt={`${type} icon`} 
         className="w-full h-full object-contain"
         onError={(e) => {
-          // Fallback to a simple text indicator if image fails to load
           const target = e.target as HTMLImageElement;
           target.style.display = 'none';
-          target.parentElement!.innerHTML = '📄';
+          if (target.parentElement) target.parentElement.innerHTML = '📄';
         }}
       />
     );
   };
 
-  // Split content into lines for highlighting
+  // ── Highlight range logic ──────────────────────────────────────────
   const lines = sourceContent.split('\n');
-  
-  // Determine the highlight range based on whether we have valid citation line data
-  let startLine: number;
-  let endLine: number;
-  
-  if (hasValidCitationLines) {
-    // For real citations with valid line data, highlight the specific lines
-    startLine = citation.chunk_lines_from!;
-    endLine = citation.chunk_lines_to!;
-    console.log('SourceContentViewer: Will highlight lines', { startLine, endLine });
-  } else {
-    // For source list clicks or citations without line data, don't highlight
-    startLine = -1;
-    endLine = -1;
-    console.log('SourceContentViewer: No highlighting (no valid line data)');
-  }
+
+  const startLine = hasValidCitationLines ? citation.chunk_lines_from! : -1;
+  const endLine   = hasValidCitationLines ? citation.chunk_lines_to!   : -1;
 
   const renderHighlightedContent = () => {
     return lines.map((line, index) => {
@@ -176,64 +113,59 @@ const SourceContentViewer = ({
       
       return (
         <div
-          key={index}
+          key={`${citation?.citation_id}-${index}`}
           ref={isFirstHighlightedLine ? highlightedContentRef : null}
-          className={`py-2 px-3 rounded leading-relaxed ${
+          className={`py-2 px-3 rounded leading-relaxed transition-colors duration-500 ${
             isHighlighted 
-              ? 'border-l-4' 
-              : 'hover:bg-gray-50'
+              ? 'border-l-4 border-purple-600 bg-purple-100 dark:bg-purple-900/40 dark:border-purple-400 text-foreground' 
+              : 'hover:bg-muted'
           }`}
-          style={isHighlighted ? { 
-            backgroundColor: '#eadef9', 
-            borderLeftColor: '#9333ea' 
-          } : {}}
         >
-          <span className={isHighlighted ? 'font-medium' : ''}>{line}</span>
+          <span className={isHighlighted ? 'font-medium text-foreground' : 'text-foreground'}>{line}</span>
         </div>
       );
     });
   };
 
+  // ── Render ──────────────────────────────────────────────────────────
   return (
     <div className={`flex flex-col h-full overflow-hidden ${className}`}>
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex-shrink-0">
+      <div className="p-4 border-b border-border flex-shrink-0">
         <div className="flex items-center space-x-2 mb-2">
-          <div className="w-6 h-6 bg-white rounded border border-gray-200 flex items-center justify-center flex-shrink-0 overflow-hidden">
+          <div className="w-6 h-6 bg-background rounded border border-border flex items-center justify-center flex-shrink-0 overflow-hidden">
             {getSourceIcon(citation.source_type)}
           </div>
-          <span className="font-medium text-gray-900 truncate">{citation.source_title}</span>
+          <span className="font-medium text-foreground truncate">{citation.source_title}</span>
         </div>
       </div>
 
       {/* Source Guide Accordion */}
       {sourceSummary && (
-        <div className="border-b border-gray-200 flex-shrink-0">
+        <div className="border-b border-border flex-shrink-0">
           <Accordion type="single" value={accordionValue} onValueChange={setAccordionValue} collapsible>
             <AccordionItem value="guide" className="border-0">
               <AccordionTrigger 
-                className="px-4 py-3 text-sm font-medium hover:no-underline hover:bg-blue-50" 
-                style={{ color: '#234776' }}
-                chevronColor="#234776"
+                className="px-4 py-3 text-sm font-medium hover:no-underline hover:bg-muted text-blue-900 dark:text-blue-400" 
               >
                 <div className="flex items-center space-x-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#234776">
+                  <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor">
                     <path d="M166.67-120.67 120-167.33l317.67-318L254-531l194-121-16.33-228 175 147L818-818.33l-85.67 211.66L880-432l-228.67-16.67-120.66 194L485-438.33 166.67-120.67Zm24.66-536L120-728l72-72 71.33 71.33-72 72Zm366.34 233 58-94.33 111 8.33-72-85 41.66-102.66-102.66 41.66-85-71.66L517-616.67l-94.33 59 108 26.67 27 107.33Zm171 303.67-71.34-72 71.34-71.33 71.33 72L728.67-120ZM575-576Z"/>
                   </svg>
-                  <span>Source guide</span>
+                  <span>Hướng dẫn nguồn</span>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
-                <div className="text-sm text-gray-700 space-y-4">
+                <div className="text-sm text-foreground/80 space-y-4">
                   <div>
-                    <h4 className="font-medium mb-2">Summary</h4>
+                    <h4 className="font-medium mb-2">Tóm tắt</h4>
                     <p className="leading-relaxed">{sourceSummary}</p>
                   </div>
                   
                   {/* Show URL for website sources */}
                   {citation.source_type === 'website' && sourceUrl && (
                     <div>
-                      <h4 className="font-medium mb-2">URL</h4>
+                      <h4 className="font-medium mb-2">Đường dẫn</h4>
                       <a 
                         href={sourceUrl} 
                         target="_blank" 
