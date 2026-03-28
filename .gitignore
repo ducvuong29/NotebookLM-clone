@@ -33,14 +33,13 @@ n8n_db.sqlite*
 # Secrets
 .env
 .roo/
-
-
 .gitnexus
-
-# AI and Agent Tooling
+# Temporary and Output Files
+# AI Agent and Local Output Directories
 .agent/
 .agents/
 .claude/
+.serena/
 _bmad/
 _bmad-output/
 design-artifacts/
@@ -48,27 +47,15 @@ plans/
 AGENTS.md
 CLAUDE.md
 skills-lock.json
+.gitnexus/
 
 # Temporary and Output Files
 admin-api-origin.ts
 admin-diff*.txt
 *_log.txt
+lint*.txt
 *.sqlite
 *.sqlite-journal
-*.patch
-
-# Supabase Local
+# Supabase Temporary Files
 supabase/.branches/
 supabase/.temp/
-
-# Testing & CI (Playwright, Jest, etc.)
-playwright-report/
-test-results/
-blob-report/
-playwright/.cache/
-coverage/
-
-# Caches
-*.tsbuildinfo
-.eslintcache
-.vite/
