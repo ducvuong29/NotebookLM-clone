@@ -59,25 +59,21 @@ const StudioSidebar = ({
   // Check if at least one source has been successfully processed
   const hasProcessedSource = sources?.some(source => source.processing_status === 'completed') || false;
 
-  // Auto-refresh expired URLs
+  // Auto-refresh expired URLs — delegate all check logic to autoRefreshIfExpired (avoids redundant double-check)
   useEffect(() => {
     if (!notebookId || !notebook?.audio_overview_url) return;
     
-    const checkAndRefresh = async () => {
-      if (checkAudioExpiry(notebook.audio_url_expires_at)) {
-        console.log('Detected expired audio URL, initiating auto-refresh...');
-        await autoRefreshIfExpired(notebookId, notebook.audio_url_expires_at);
-      }
-    };
-
-    // Check immediately
-    checkAndRefresh();
+    // Call directly — autoRefreshIfExpired internally guards against concurrent calls
+    autoRefreshIfExpired(notebookId, notebook.audio_url_expires_at);
 
     // Set up periodic check every 5 minutes
-    const interval = setInterval(checkAndRefresh, 5 * 60 * 1000);
+    const interval = setInterval(
+      () => autoRefreshIfExpired(notebookId, notebook.audio_url_expires_at),
+      5 * 60 * 1000
+    );
 
     return () => clearInterval(interval);
-  }, [notebookId, notebook?.audio_overview_url, notebook?.audio_url_expires_at, autoRefreshIfExpired, checkAudioExpiry]);
+  }, [notebookId, notebook?.audio_overview_url, notebook?.audio_url_expires_at, autoRefreshIfExpired]);
 
   const handleCreateNote = () => {
     setIsCreatingNote(true);

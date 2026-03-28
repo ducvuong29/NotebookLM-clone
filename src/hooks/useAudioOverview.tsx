@@ -16,7 +16,7 @@ export const useAudioOverview = (notebookId?: string) => {
     if (!notebookId) return;
 
     const channel = supabase
-      .channel('notebook-audio-updates')
+      .channel(`notebook-audio-updates-${notebookId}`)
       .on(
         'postgres_changes',
         {

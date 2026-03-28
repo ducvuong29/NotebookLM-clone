@@ -85,7 +85,7 @@ export const useNotebookDelete = () => {
       
       // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['notebooks', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['public-notebooks'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-notebooks'] });
       queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
       queryClient.invalidateQueries({ queryKey: ['notebook', notebookId] });
       
