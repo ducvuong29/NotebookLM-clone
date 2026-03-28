@@ -24,10 +24,13 @@ export const useNotebooks = () => {
       console.log('Fetching notebooks for user:', user.id);
       
       // First get the notebooks
+      // RLS handles visibility scoping:
+      // - Owner sees own notebooks (user_id = auth.uid())
+      // - All authenticated users see public notebooks (visibility = 'public')
+      // - Admins see everything (admin bypass)
       const { data: notebooksData, error: notebooksError } = await supabase
         .from('notebooks')
         .select('*')
-        .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
       if (notebooksError) {
@@ -79,7 +82,6 @@ export const useNotebooks = () => {
           event: '*',
           schema: 'public',
           table: 'notebooks',
-          filter: `user_id=eq.${user.id}`
         },
         (payload) => {
           console.log('Real-time notebook update received:', payload);

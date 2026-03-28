@@ -53,7 +53,7 @@ export const useSources = (notebookId?: string) => {
           // Update the query cache based on the event type
           queryClient.setQueryData(['sources', notebookId], (oldSources: any[] = []) => {
             switch (payload.eventType) {
-              case 'INSERT':
+              case 'INSERT': {
                 // Add new source if it doesn't already exist
                 const newSource = payload.new as any;
                 const existsInsert = oldSources.some(source => source.id === newSource?.id);
@@ -63,20 +63,23 @@ export const useSources = (notebookId?: string) => {
                 }
                 console.log('Adding new source to cache:', newSource);
                 return [newSource, ...oldSources];
+              }
                 
-              case 'UPDATE':
+              case 'UPDATE': {
                 // Update existing source
                 const updatedSource = payload.new as any;
                 console.log('Updating source in cache:', updatedSource?.id);
                 return oldSources.map(source => 
                   source.id === updatedSource?.id ? updatedSource : source
                 );
+              }
                 
-              case 'DELETE':
+              case 'DELETE': {
                 // Remove deleted source
                 const deletedSource = payload.old as any;
                 console.log('Removing source from cache:', deletedSource?.id);
                 return oldSources.filter(source => source.id !== deletedSource?.id);
+              }
                 
               default:
                 console.log('Unknown event type:', payload.eventType);
