@@ -1,20 +1,13 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import NotebookCard from './NotebookCard';
-import { Check, Grid3X3, List, ChevronDown } from 'lucide-react';
+import NotebookSection from './NotebookSection';
+import type { FormattedNotebook } from './NotebookSection';
 import { useNotebooks } from '@/hooks/useNotebooks';
 import { useNavigate } from 'react-router-dom';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/contexts/AuthContext';
 
 const NotebookGrid = () => {
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState('Most recent');
   const {
     notebooks,
     isLoading,
@@ -22,31 +15,44 @@ const NotebookGrid = () => {
     isCreating
   } = useNotebooks();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const formattedNotebooks = useMemo(() => {
-    if (!notebooks) return [];
-    
-    const sorted = [...notebooks];
-    
-    if (sortBy === 'Most recent') {
-      sorted.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-    } else if (sortBy === 'Title') {
-      sorted.sort((a, b) => a.title.localeCompare(b.title));
+  // Derive formatted + split notebooks during render (rerender-derived-state-no-effect)
+  // Single pass: format + partition into public/private (js-combine-iterations)
+  const { publicNotebooks, privateNotebooks } = useMemo(() => {
+    if (!notebooks) return { publicNotebooks: [], privateNotebooks: [] };
+
+    const publicList: FormattedNotebook[] = [];
+    const privateList: FormattedNotebook[] = [];
+
+    for (const notebook of notebooks) {
+      const formatted: FormattedNotebook = {
+        id: notebook.id,
+        title: notebook.title,
+        date: new Date(notebook.updated_at).toLocaleDateString('vi-VN', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        }),
+        updatedAt: notebook.updated_at,
+        sources: notebook.sources?.[0]?.count || 0,
+        icon: notebook.icon || '📝',
+        color: notebook.color || 'bg-gray-100',
+        visibility: notebook.visibility || 'private',
+        canDelete: notebook.user_id === user?.id,
+      };
+
+      // Public section = notebooks with visibility 'public' AND owned by OTHER users
+      // Owner's own public notebooks appear in their private section (they own them)
+      if (notebook.visibility === 'public' && notebook.user_id !== user?.id) {
+        publicList.push({ ...formatted, canDelete: false });
+      } else {
+        privateList.push(formatted);
+      }
     }
-    
-    return sorted.map(notebook => ({
-      id: notebook.id,
-      title: notebook.title,
-      date: new Date(notebook.updated_at).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      }),
-      sources: notebook.sources?.[0]?.count || 0,
-      icon: notebook.icon || '📝',
-      color: notebook.color || 'bg-gray-100'
-    }));
-  }, [notebooks, sortBy]);
+
+    return { publicNotebooks: publicList, privateNotebooks: privateList };
+  }, [notebooks, user?.id]);
 
   const handleCreateNotebook = () => {
     createNotebook({
@@ -81,40 +87,30 @@ const NotebookGrid = () => {
   }
 
   return <div>
+      {/* Create button — always at top */}
       <div className="flex items-center justify-between mb-8">
         <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6" onClick={handleCreateNotebook} disabled={isCreating}>
-          {isCreating ? 'Creating...' : '+ Create new'}
+          {isCreating ? 'Đang tạo...' : '+ Tạo mới'}
         </Button>
-        
-        <div className="flex items-center space-x-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <div className="flex items-center space-x-2 bg-background rounded-lg border border-border px-3 py-2 cursor-pointer hover:bg-muted transition-colors">
-                <span className="text-sm text-muted-foreground">{sortBy}</span>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => setSortBy('Most recent')} className="flex items-center justify-between">
-                Most recent
-                {sortBy === 'Most recent' && <Check className="h-4 w-4" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortBy('Title')} className="flex items-center justify-between">
-                Title
-                {sortBy === 'Title' && <Check className="h-4 w-4" />}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {formattedNotebooks.map(notebook => (
-          <div key={notebook.id} onClick={e => handleNotebookClick(notebook.id, e)} className="h-full">
-            <NotebookCard notebook={notebook} />
-          </div>
-        ))}
-      </div>
+      {/* Public Notebooks Section */}
+      <NotebookSection
+        title="Notebook Công khai"
+        notebooks={publicNotebooks}
+        emptyMessage="Chưa có notebook công khai nào"
+        onNotebookClick={handleNotebookClick}
+        variant="public"
+      />
+
+      {/* Private Notebooks Section */}
+      <NotebookSection
+        title="Notebook của tôi"
+        notebooks={privateNotebooks}
+        emptyMessage="Bạn chưa có notebook nào"
+        onNotebookClick={handleNotebookClick}
+        variant="private"
+      />
     </div>;
 };
 

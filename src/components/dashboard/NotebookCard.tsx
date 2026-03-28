@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Globe } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { useNotebookDelete } from '@/hooks/useNotebookDelete';
+import { cn } from '@/lib/utils';
 
 interface NotebookCardProps {
   notebook: {
@@ -12,11 +14,14 @@ interface NotebookCardProps {
     icon: string;
     color: string;
     hasCollaborators?: boolean;
+    visibility?: 'public' | 'private';
   };
+  canDelete?: boolean;
 }
 
 const NotebookCard = ({
-  notebook
+  notebook,
+  canDelete = true,
 }: NotebookCardProps) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const {
@@ -60,31 +65,38 @@ const NotebookCard = ({
   const borderClass = themeColors.border;
 
   return <div 
-      className={`rounded-lg border ${borderClass} ${backgroundClass} p-4 hover:shadow-md transition-shadow cursor-pointer relative h-48 flex flex-col`}
+      className={cn(
+        'rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer relative h-48 flex flex-col',
+        borderClass,
+        backgroundClass
+      )}
     >
-      <div className="absolute top-3 right-3" data-delete-action="true">
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogTrigger asChild>
-            <button aria-label={`Xóa notebook ${notebook.title}`} onClick={handleDeleteClick} className="min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 p-1 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-muted-foreground hover:text-red-500 transition-colors delete-button" disabled={isDeleting} data-delete-action="true">
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Xóa notebook này?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Bạn sắp xóa notebook này và toàn bộ nội dung bên trong. Hành động này không thể hoàn tác.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Hủy</AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirmDelete} className="bg-blue-600 hover:bg-blue-700" disabled={isDeleting}>
-                {isDeleting ? 'Đang xóa...' : 'Xóa'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+      {/* Delete button — only shown when user owns the notebook */}
+      {canDelete && (
+        <div className="absolute top-3 right-3" data-delete-action="true">
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogTrigger asChild>
+              <button aria-label={`Xóa notebook ${notebook.title}`} onClick={handleDeleteClick} className="min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 p-1 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-muted-foreground hover:text-red-500 transition-colors delete-button" disabled={isDeleting} data-delete-action="true">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Xóa notebook này?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Bạn sắp xóa notebook này và toàn bộ nội dung bên trong. Hành động này không thể hoàn tác.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Hủy</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmDelete} className="bg-blue-600 hover:bg-blue-700" disabled={isDeleting}>
+                  {isDeleting ? 'Đang xóa...' : 'Xóa'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
       
       <div className="w-12 h-12 rounded-lg flex items-center justify-center mb-4">
         <span className="text-3xl">{notebook.icon}</span>
@@ -96,6 +108,16 @@ const NotebookCard = ({
       
       <div className="flex items-center justify-between text-sm text-muted-foreground mt-auto">
         <span>{notebook.date} • {notebook.sources} nguồn</span>
+        {/* Public visibility badge */}
+        {notebook.visibility === 'public' && (
+          <Badge
+            variant="secondary"
+            className="text-xs gap-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700/50"
+          >
+            <Globe className="h-3 w-3" />
+            Công khai
+          </Badge>
+        )}
       </div>
     </div>;
 };
