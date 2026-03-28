@@ -448,10 +448,13 @@ ALTER TABLE public.sources REPLICA IDENTITY FULL;
 ALTER TABLE public.notes REPLICA IDENTITY FULL;
 ALTER TABLE public.n8n_chat_histories REPLICA IDENTITY FULL;
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notebooks;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.sources;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notes;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.n8n_chat_histories;
+-- Set realtime publication tables (idempotent — SET TABLE replaces all members)
+-- This approach works even if v0.1 already added these tables.
+ALTER PUBLICATION supabase_realtime SET TABLE
+  public.notebooks,
+  public.sources,
+  public.notes,
+  public.n8n_chat_histories;
 
 -- ============================================================================
 -- STORAGE BUCKETS AND POLICIES
@@ -492,6 +495,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- ===== SOURCES BUCKET RLS =====
 -- (Fix #1 — using (select auth.uid()) in storage policies too)
 
+DROP POLICY IF EXISTS "Users can view their own source files" ON storage.objects;
 CREATE POLICY "Users can view their own source files"
 ON storage.objects FOR SELECT
 USING (
@@ -501,6 +505,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Users can upload source files to their notebooks" ON storage.objects;
 CREATE POLICY "Users can upload source files to their notebooks"
 ON storage.objects FOR INSERT
 WITH CHECK (
@@ -510,6 +515,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Users can update their own source files" ON storage.objects;
 CREATE POLICY "Users can update their own source files"
 ON storage.objects FOR UPDATE
 USING (
@@ -519,6 +525,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Users can delete their own source files" ON storage.objects;
 CREATE POLICY "Users can delete their own source files"
 ON storage.objects FOR DELETE
 USING (
@@ -530,6 +537,7 @@ USING (
 
 -- ===== AUDIO BUCKET RLS =====
 
+DROP POLICY IF EXISTS "Users can view their own audio files" ON storage.objects;
 CREATE POLICY "Users can view their own audio files"
 ON storage.objects FOR SELECT
 USING (
@@ -539,6 +547,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Service role can manage audio files" ON storage.objects;
 CREATE POLICY "Service role can manage audio files"
 ON storage.objects FOR ALL
 USING (
@@ -546,6 +555,7 @@ USING (
   auth.role() = 'service_role'
 );
 
+DROP POLICY IF EXISTS "Users can delete their own audio files" ON storage.objects;
 CREATE POLICY "Users can delete their own audio files"
 ON storage.objects FOR DELETE
 USING (
@@ -557,10 +567,12 @@ USING (
 
 -- ===== PUBLIC-IMAGES BUCKET RLS =====
 
+DROP POLICY IF EXISTS "Anyone can view public images" ON storage.objects;
 CREATE POLICY "Anyone can view public images"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'public-images');
 
+DROP POLICY IF EXISTS "Service role can manage public images" ON storage.objects;
 CREATE POLICY "Service role can manage public images"
 ON storage.objects FOR ALL
 USING (
