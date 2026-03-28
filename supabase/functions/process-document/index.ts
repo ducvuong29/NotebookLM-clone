@@ -1,50 +1,18 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { corsHeaders, corsResponse } from '../_shared/cors.ts'
+import { authenticateRequest } from '../_shared/auth.ts'
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return corsResponse();
 
   try {
     // ============ AUTHORIZATION CHECK ============
-    // Get the JWT from the Authorization header
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const { user, error: authError } = await authenticateRequest(req)
+    if (authError) return authError
 
-    // Create a Supabase client with the user's JWT to verify identity
-    const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader }
-        }
-      }
-    )
-
-    // Verify the user is authenticated
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser()
-    if (userError || !user) {
-      console.error('Auth error:', userError)
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log('Authenticated user:', user.id)
+    console.log('Authenticated user:', user!.id)
     // ============ END AUTHORIZATION CHECK ============
 
     const { sourceId, filePath, sourceType } = await req.json()
@@ -77,15 +45,15 @@ serve(async (req) => {
     }
 
     // Check that the user owns the notebook this source belongs to
-    if (source.notebooks.user_id !== user.id) {
-      console.error('User does not own this source:', { userId: user.id, ownerId: source.notebooks.user_id })
+    if (source.notebooks.user_id !== user!.id) {
+      console.error('User does not own this source:', { userId: user!.id, ownerId: source.notebooks.user_id })
       return new Response(
         JSON.stringify({ error: 'Forbidden - you do not own this resource' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('Processing document:', { source_id: sourceId, file_path: filePath, source_type: sourceType, user_id: user.id });
+    console.log('Processing document:', { source_id: sourceId, file_path: filePath, source_type: sourceType, user_id: user!.id });
 
     // Get environment variables
     const webhookUrl = Deno.env.get('DOCUMENT_PROCESSING_WEBHOOK_URL')

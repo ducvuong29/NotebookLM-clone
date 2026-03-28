@@ -336,14 +336,19 @@ interface CreatePublicNotebookResponseData {
 }
 
 async function handleCreatePublicNotebook(
-  body: { title?: string },
+  body: { title?: string; visibility?: string },
   supabaseAdmin: ReturnType<typeof createClient>,
   userId: string
 ): Promise<Response> {
   const { title } = body
+  const visibility = body.visibility ?? 'public'
 
   if (!title || title.trim() === '') {
     return errorResponse(400, 'INVALID_INPUT', 'Vui lòng nhập tên notebook')
+  }
+
+  if (!['public', 'private'].includes(visibility)) {
+    return errorResponse(400, 'INVALID_INPUT', 'Chế độ hiển thị không hợp lệ (public hoặc private)')
   }
 
   const { data, error } = await supabaseAdmin
@@ -351,7 +356,7 @@ async function handleCreatePublicNotebook(
     .insert({
       title: title.trim(),
       user_id: userId,
-      visibility: 'public'
+      visibility
     })
     .select('id')
     .single()
@@ -361,7 +366,7 @@ async function handleCreatePublicNotebook(
     return errorResponse(500, 'INTERNAL_ERROR', 'Không thể tạo public notebook')
   }
 
-  console.log('[admin-api] Public notebook created:', { notebook_id: data.id, user_id: userId })
+  console.log('[admin-api] Public notebook created:', { notebook_id: data.id, visibility, user_id: userId })
 
   return successResponse<CreatePublicNotebookResponseData>({
     notebook_id: data.id
@@ -442,10 +447,66 @@ async function handleDeletePublicNotebook(
 }
 
 // ============================================================================
+// toggle_visibility — Toggle notebook visibility (public/private)
+// ============================================================================
+
+interface ToggleVisibilityResponseData {
+  notebook_id: string
+  visibility: string
+}
+
+async function handleToggleVisibility(
+  body: { notebook_id?: string; visibility?: string },
+  supabaseAdmin: ReturnType<typeof createClient>
+): Promise<Response> {
+  const { notebook_id, visibility } = body
+
+  if (!notebook_id || !visibility || !['public', 'private'].includes(visibility)) {
+    return errorResponse(400, 'INVALID_INPUT', 'Thiếu thông tin hoặc giá trị không hợp lệ')
+  }
+
+  // Verify notebook exists before updating
+  const { data: notebook, error: fetchError } = await supabaseAdmin
+    .from('notebooks')
+    .select('id, visibility')
+    .eq('id', notebook_id)
+    .single()
+
+  if (fetchError || !notebook) {
+    return errorResponse(404, 'NOT_FOUND', 'Không tìm thấy notebook')
+  }
+
+  if (notebook.visibility === visibility) {
+    // Already in desired state, return success idempotently
+    return successResponse<ToggleVisibilityResponseData>({
+      notebook_id,
+      visibility
+    })
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from('notebooks')
+    .update({ visibility })
+    .eq('id', notebook_id)
+
+  if (updateError) {
+    console.error('[admin-api] toggleVisibility error:', updateError)
+    return errorResponse(500, 'INTERNAL_ERROR', 'Không thể cập nhật chế độ hiển thị')
+  }
+
+  console.log('[admin-api] Notebook visibility updated:', { notebook_id, visibility })
+
+  return successResponse<ToggleVisibilityResponseData>({
+    notebook_id,
+    visibility
+  })
+}
+
+// ============================================================================
 // Main Handler
 // ============================================================================
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -527,6 +588,9 @@ serve(async (req) => {
 
       case 'delete_public_notebook':
         return await handleDeletePublicNotebook(body, supabaseAdmin)
+
+      case 'toggle_visibility':
+        return await handleToggleVisibility(body, supabaseAdmin)
 
       default:
         return errorResponse(400, 'INVALID_ACTION', 'Hành động không hợp lệ')
