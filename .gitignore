@@ -22,8 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.env.example
-.gitnexus
+.eslintcache
+
 
 
 
@@ -34,33 +34,41 @@ n8n_db.sqlite*
 .env
 .roo/
 
-# AI configs, Agents and skills
+
+.gitnexus
+
+# AI and Agent Tooling
 .agent/
 .agents/
-_agent/
-_agents/
+.claude/
 _bmad/
 _bmad-output/
-.claude/
-.cline/
-.serena/
+design-artifacts/
+plans/
 AGENTS.md
-AGENTS_GUIDE.md
 CLAUDE.md
 skills-lock.json
 
-# Temp & Debug files
-temp_*.txt
-patch-supabase.js
-query_schema.js
-push_error.txt
-errors.json
-thumb.jpg
-n8n/
-temp_n8n_query/
+# Temporary and Output Files
+admin-api-origin.ts
+admin-diff*.txt
+*_log.txt
+*.sqlite
+*.sqlite-journal
+*.patch
 
-# Testing
+# Supabase Local
+supabase/.branches/
+supabase/.temp/
+
+# Testing & CI (Playwright, Jest, etc.)
 playwright-report/
 test-results/
-pw-output*.log
-test-*.log
+blob-report/
+playwright/.cache/
+coverage/
+
+# Caches
+*.tsbuildinfo
+.eslintcache
+.vite/
