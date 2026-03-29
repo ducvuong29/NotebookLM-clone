@@ -33,21 +33,10 @@ n8n_db.sqlite*
 # Secrets
 .env
 .roo/
-.gitnexus
+
 # Temporary and Output Files
 # AI Agent and Local Output Directories
-.agent/
-.agents/
-.claude/
-.serena/
-_bmad/
-_bmad-output/
-design-artifacts/
-plans/
-AGENTS.md
-CLAUDE.md
-skills-lock.json
-.gitnexus/
+
 
 # Temporary and Output Files
 admin-api-origin.ts
@@ -59,3 +48,15 @@ lint*.txt
 # Supabase Temporary Files
 supabase/.branches/
 supabase/.temp/
+
+# AI Agent and Local Output
+.agent/
+.agents/
+.claude/
+.gitnexus/
+.serena/
+AGENTS.md
+CLAUDE.md
+_bmad-output/
+_bmad/
+skills-lock.json
