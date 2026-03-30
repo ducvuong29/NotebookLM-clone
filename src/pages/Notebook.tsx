@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { useNotebooks } from '@/hooks/useNotebooks';
 import { useSources } from '@/hooks/useSources';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
+import { useNotebookPermissions } from '@/hooks/useNotebookPermissions';
 import NotebookHeader from '@/components/notebook/NotebookHeader';
 import SourcesSidebar from '@/components/notebook/SourcesSidebar';
 import ChatArea from '@/components/notebook/ChatArea';
@@ -23,6 +24,21 @@ const Notebook = () => {
   const notebook = notebooks?.find(n => n.id === notebookId);
   const hasSource = sources && sources.length > 0;
   const isSourceDocumentOpen = !!selectedCitation;
+
+  // C-2 + H-3 fix: Centralize permission derivation — call once, pass down as props
+  // This avoids 3 separate useNotebookPermissions calls in child components
+  // TanStack Query dedup handles the underlying useNotebookMembers call, 
+  // but centralizing avoids extra subscription overhead
+  const {
+    role,
+    canEdit,
+    canDelete,
+    canInvite,
+    canChat,
+    isMember,
+    isOwner,
+    isLoading: permissionsLoading,
+  } = useNotebookPermissions(notebookId, notebook?.user_id);
 
   const handleCitationClick = (citation: Citation) => {
     setSelectedCitation(citation);
@@ -46,6 +62,11 @@ const Notebook = () => {
       <NotebookHeader 
         title={notebook?.title || 'Notebook chưa đặt tên'} 
         notebookId={notebookId} 
+        notebookOwnerId={notebook?.user_id}
+        role={role}
+        canEdit={canEdit}
+        canInvite={canInvite}
+        isMember={isMember}
       />
       
       {isDesktop ? (
@@ -58,6 +79,8 @@ const Notebook = () => {
               selectedCitation={selectedCitation}
               onCitationClose={handleCitationClose}
               setSelectedCitation={setSelectedCitation}
+              canEdit={canEdit}
+              canDelete={canDelete}
             />
           </div>
           
@@ -77,6 +100,8 @@ const Notebook = () => {
             <StudioSidebar 
               notebookId={notebookId} 
               onCitationClick={handleCitationClick}
+              canEdit={canEdit}
+              canDelete={canDelete}
             />
           </div>
         </main>
@@ -94,6 +119,8 @@ const Notebook = () => {
             onCitationClick={handleCitationClick}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
+            canEdit={canEdit}
+            canDelete={canDelete}
           />
           </ErrorBoundary>
         </main>

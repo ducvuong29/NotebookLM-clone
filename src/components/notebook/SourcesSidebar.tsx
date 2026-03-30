@@ -13,12 +13,15 @@ import { useSources } from '@/hooks/useSources';
 import { useSourceDelete } from '@/hooks/useSourceDelete';
 import { Citation } from '@/types/message';
 
+
 interface SourcesSidebarProps {
   hasSource: boolean;
   notebookId?: string;
   selectedCitation?: Citation | null;
   onCitationClose?: () => void;
   setSelectedCitation?: (citation: Citation | null) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 const SourcesSidebar = ({
@@ -26,7 +29,9 @@ const SourcesSidebar = ({
   notebookId,
   selectedCitation,
   onCitationClose,
-  setSelectedCitation
+  setSelectedCitation,
+  canEdit = true,
+  canDelete = true,
 }: SourcesSidebarProps) => {
   const [showAddSourcesDialog, setShowAddSourcesDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -43,6 +48,8 @@ const SourcesSidebar = ({
     deleteSource,
     isDeleting
   } = useSourceDelete();
+
+  // Permission booleans received via props from Notebook.tsx (H-3 centralization)
 
   // Get the source content for the selected citation
   const getSourceContent = (citation: Citation) => {
@@ -214,15 +221,17 @@ const SourcesSidebar = ({
     <div className="w-full bg-muted/30 border-r border-border flex flex-col h-full overflow-hidden">
       <div className="p-4 border-b border-border flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-foreground">Sources</h2>
+          <h2 className="text-lg font-medium text-foreground">Nguồn tài liệu</h2>
         </div>
         
-        <div className="flex space-x-2">
-          <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowAddSourcesDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add
-          </Button>
-        </div>
+        {canEdit && (
+          <div className="flex space-x-2">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowAddSourcesDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Thêm nguồn
+            </Button>
+          </div>
+        )}
       </div>
 
       <ScrollArea className="flex-1 h-full">
@@ -253,14 +262,23 @@ const SourcesSidebar = ({
                     </Card>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
-                    <ContextMenuItem onClick={() => handleRenameSource(source)}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Rename source
-                    </ContextMenuItem>
-                    <ContextMenuItem onClick={() => handleRemoveSource(source)} className="text-red-600 focus:text-red-600">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Remove source
-                    </ContextMenuItem>
+                    {canEdit && (
+                      <ContextMenuItem onClick={() => handleRenameSource(source)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Đổi tên nguồn
+                      </ContextMenuItem>
+                    )}
+                    {canDelete && (
+                      <ContextMenuItem onClick={() => handleRemoveSource(source)} className="text-red-600 focus:text-red-600">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Xóa nguồn
+                      </ContextMenuItem>
+                    )}
+                    {!canEdit && !canDelete && (
+                      <ContextMenuItem disabled>
+                        Không có quyền sửa đổi
+                      </ContextMenuItem>
+                    )}
                   </ContextMenuContent>
                 </ContextMenu>
               ))}

@@ -161,68 +161,76 @@ export const useChatMessages = (notebookId?: string) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Derive compositeSessionId during render — NOT in state or effect
+  // Per rerender-derived-state-no-effect: derive from props, don't store
+  const userId = user?.id;
+  const compositeSessionId = notebookId && userId ? `${notebookId}:${userId}` : null;
+
   const {
     data: messages = [],
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['chat-messages', notebookId],
+    // Per-user cache isolation: include userId in query key
+    queryKey: ['chat-messages', notebookId, userId],
     queryFn: async () => {
-      if (!notebookId) return [];
+      if (!compositeSessionId) return [];
       
-      const { data, error } = await supabase
-        .from('n8n_chat_histories')
-        .select('*')
-        .eq('session_id', notebookId)
-        .order('id', { ascending: true });
+      // Per async-parallel (CRITICAL): fetch chat history + sources in parallel
+      // Eliminates waterfall — up to 2x faster initial load
+      const [chatResult, sourcesResult] = await Promise.all([
+        supabase
+          .from('n8n_chat_histories')
+          .select('*')
+          .eq('session_id', compositeSessionId)
+          .order('id', { ascending: true }),
+        supabase
+          .from('sources')
+          .select('id, title, type')
+          .eq('notebook_id', notebookId!)
+      ]);
 
-      if (error) throw error;
+      if (chatResult.error) throw chatResult.error;
       
-      // Also fetch sources to get proper source titles
-      const { data: sourcesData } = await supabase
-        .from('sources')
-        .select('id, title, type')
-        .eq('notebook_id', notebookId);
+      // Per js-index-maps: Map for O(1) source lookups — already correct pattern
+      const sourceMap = new Map(sourcesResult.data?.map(s => [s.id, s]) || []);
       
-      const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
-      
+      // Cache the sourceMap for Realtime subscription to use (avoids N+1 query)
+      queryClient.setQueryData(['sources-map', notebookId], sourceMap);
       
       // Transform the data to match our expected format
-      return data.map((item) => transformMessage(item, sourceMap));
+      return chatResult.data.map((item) => transformMessage(item, sourceMap));
     },
-    enabled: !!notebookId && !!user,
+    enabled: !!compositeSessionId,
     refetchOnMount: true,
     refetchOnReconnect: true,
   });
 
   // Set up Realtime subscription for new messages
+  // Per rerender-dependencies: use compositeSessionId (primitive string) as dep
+  // instead of user (object) — prevents re-subscription on unrelated user field changes
   useEffect(() => {
-    if (!notebookId || !user) return;
+    if (!compositeSessionId || !notebookId) return;
 
     const channel = supabase
-      .channel('chat-messages')
+      .channel(`chat-messages-${compositeSessionId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'n8n_chat_histories',
-          filter: `session_id=eq.${notebookId}`
+          filter: `session_id=eq.${compositeSessionId}`
         },
         async (payload) => {
-          // Fetch sources for proper transformation
-          const { data: sourcesData } = await supabase
-            .from('sources')
-            .select('id, title, type')
-            .eq('notebook_id', notebookId);
-          
-          const sourceMap = new Map(sourcesData?.map(s => [s.id, s]) || []);
+          // Retrieve sources from React Query cache instead of DB to avoid N+1 queries
+          const sourceMap = queryClient.getQueryData<Map<string, any>>(['sources-map', notebookId]) || new Map();
           
           // Transform the new message
           const newMessage = transformMessage(payload.new, sourceMap);
           
           // Update the query cache with the new message
-          queryClient.setQueryData(['chat-messages', notebookId], (oldMessages: EnhancedChatMessage[] = []) => {
+          queryClient.setQueryData(['chat-messages', notebookId, userId], (oldMessages: EnhancedChatMessage[] = []) => {
             // Check if message already exists to prevent duplicates
             const messageExists = oldMessages.some(msg => msg.id === newMessage.id);
             if (messageExists) {
@@ -235,10 +243,11 @@ export const useChatMessages = (notebookId?: string) => {
       )
       .subscribe();
 
+    // Per client-event-listeners: cleanup via removeChannel on unmount
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [notebookId, user, queryClient]);
+  }, [compositeSessionId, queryClient, notebookId, userId]);
 
   const sendMessage = useMutation({
     mutationFn: async (messageData: {
@@ -248,12 +257,12 @@ export const useChatMessages = (notebookId?: string) => {
     }) => {
       if (!user) throw new Error('User not authenticated');
 
-      // Call the n8n webhook
+      // Call the n8n webhook — pass notebook_id (not session_id) to Edge Function
+      // Edge Function constructs composite session_id server-side (security!)
       const webhookResponse = await supabase.functions.invoke('send-chat-message', {
         body: {
-          session_id: messageData.notebookId,
+          notebook_id: messageData.notebookId,
           message: messageData.content,
-          user_id: user.id
         }
       });
 
@@ -276,30 +285,34 @@ export const useChatMessages = (notebookId?: string) => {
   });
 
   const deleteChatHistory = useMutation({
-    mutationFn: async (notebookId: string) => {
+    mutationFn: async (targetNotebookId: string) => {
       if (!user) throw new Error('User not authenticated');
+      
+      // Construct composite session_id for deletion — scoped to current user only
+      // Per AC #7: deletes only the current user's chat, not all members' chats
+      const deleteSessionId = `${targetNotebookId}:${user.id}`;
       
       const { error } = await supabase
         .from('n8n_chat_histories')
         .delete()
-        .eq('session_id', notebookId);
+        .eq('session_id', deleteSessionId);
 
       if (error) {
         throw error;
       }
       
-      return notebookId;
+      return targetNotebookId;
     },
-    onSuccess: (notebookId) => {
+    onSuccess: (targetNotebookId) => {
       toast({
         title: "Đã xóa lịch sử trò chuyện",
-        description: "Toàn bộ tin nhắn đã được xóa thành công.",
+        description: "Toàn bộ tin nhắn của bạn đã được xóa thành công.",
       });
       
       // Clear the query data and refetch to confirm
-      queryClient.setQueryData(['chat-messages', notebookId], []);
+      queryClient.setQueryData(['chat-messages', targetNotebookId, userId], []);
       queryClient.invalidateQueries({
-        queryKey: ['chat-messages', notebookId]
+        queryKey: ['chat-messages', targetNotebookId, userId]
       });
     },
     onError: (error) => {

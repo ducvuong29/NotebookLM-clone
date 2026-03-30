@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Check, ChevronDown, Globe, Lock } from 'lucide-react';
+import { Check, ChevronDown, Globe, Lock, Users } from 'lucide-react';
 import NotebookCard from './NotebookCard';
 import {
   DropdownMenu,
@@ -30,7 +30,7 @@ interface NotebookSectionProps {
   onCreateNotebook?: () => void;
   isCreating?: boolean;
   onNotebookClick: (id: string, e: React.MouseEvent) => void;
-  variant?: 'public' | 'private';
+  variant?: 'public' | 'private' | 'shared';
 }
 
 const NotebookSection = ({
@@ -58,9 +58,10 @@ const NotebookSection = ({
   }, [notebooks, sortBy]);
 
   const isPublic = variant === 'public';
+  const isShared = variant === 'shared';
 
   // Section icon based on variant
-  const SectionIcon = isPublic ? Globe : Lock;
+  const SectionIcon = isPublic ? Globe : isShared ? Users : Lock;
 
   return (
     <section className="mb-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -71,12 +72,16 @@ const NotebookSection = ({
             "flex items-center justify-center w-8 h-8 rounded-lg",
             isPublic
               ? "bg-emerald-100 dark:bg-emerald-900/30"
+              : isShared
+              ? "bg-amber-100 dark:bg-amber-900/30"
               : "bg-indigo-100 dark:bg-indigo-900/30"
           )}>
             <SectionIcon className={cn(
               "h-4 w-4",
               isPublic
                 ? "text-emerald-600 dark:text-emerald-400"
+                : isShared
+                ? "text-amber-600 dark:text-amber-400"
                 : "text-indigo-600 dark:text-indigo-400"
             )} />
           </div>
@@ -130,12 +135,16 @@ const NotebookSection = ({
           "rounded-xl border-2 border-dashed py-12 px-6 text-center transition-colors",
           isPublic
             ? "border-emerald-200 dark:border-emerald-800/40 bg-emerald-50/50 dark:bg-emerald-950/20"
+            : isShared
+            ? "border-amber-200 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-950/20"
             : "border-indigo-200 dark:border-indigo-800/40 bg-indigo-50/50 dark:bg-indigo-950/20"
         )}>
           <SectionIcon className={cn(
             "h-10 w-10 mx-auto mb-3",
             isPublic
               ? "text-emerald-300 dark:text-emerald-700"
+              : isShared
+              ? "text-amber-300 dark:text-amber-700"
               : "text-indigo-300 dark:text-indigo-700"
           )} />
           <p className="text-muted-foreground text-sm">{emptyMessage}</p>

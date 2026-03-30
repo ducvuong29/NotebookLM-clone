@@ -1,5 +1,6 @@
 import React from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import InvitationBanner from "@/components/dashboard/InvitationBanner";
 import NotebookGrid from "@/components/dashboard/NotebookGrid";
 import EmptyDashboard from "@/components/dashboard/EmptyDashboard";
 import { useNotebooks } from "@/hooks/useNotebooks";
@@ -20,6 +21,9 @@ const Dashboard = () => {
             Chào mừng đến InsightsLM
           </h1>
         </div>
+
+        {/* Invitation Banner — renders above notebooks, returns null when empty */}
+        <InvitationBanner />
 
         {authLoading || isLoading ? (
           <div className="text-center py-16 animate-in fade-in duration-500">

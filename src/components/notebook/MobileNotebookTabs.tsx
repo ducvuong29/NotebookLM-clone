@@ -24,6 +24,9 @@ interface MobileNotebookTabsProps {
   onCitationClick?: (citation: Citation) => void;
   activeTab?: string;
   setActiveTab?: (tab: string) => void;
+  // Permission props forwarded from Notebook.tsx (H-4 fix)
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 const MobileNotebookTabs = ({
@@ -35,7 +38,9 @@ const MobileNotebookTabs = ({
   setSelectedCitation,
   onCitationClick,
   activeTab = 'chat',
-  setActiveTab
+  setActiveTab,
+  canEdit,
+  canDelete,
 }: MobileNotebookTabsProps) => {
   return (
     <Tabs value={activeTab} onValueChange={(value) => setActiveTab?.(value)} className="flex-1 flex flex-col overflow-hidden">
@@ -70,6 +75,8 @@ const MobileNotebookTabs = ({
           selectedCitation={selectedCitation}
           onCitationClose={onCitationClose}
           setSelectedCitation={setSelectedCitation}
+          canEdit={canEdit}
+          canDelete={canDelete}
         />
       </TabsContent>
 
@@ -87,6 +94,8 @@ const MobileNotebookTabs = ({
         <StudioSidebar 
           notebookId={notebookId}
           onCitationClick={onCitationClick}
+          canEdit={canEdit}
+          canDelete={canDelete}
         />
       </TabsContent>
     </Tabs>

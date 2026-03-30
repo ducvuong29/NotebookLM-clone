@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders, corsResponse } from '../_shared/cors.ts'
 import { authenticateRequest } from '../_shared/auth.ts'
 
@@ -15,12 +16,83 @@ serve(async (req) => {
     console.log('Authenticated user:', user!.id)
     // ============ END AUTHORIZATION CHECK ============
 
-    const { session_id, message } = await req.json();
-    
-    // Use the verified user ID, not the one from the request body (security!)
+    const { notebook_id, message } = await req.json();
+
+    // Validate notebook_id is provided
+    if (!notebook_id) {
+      return new Response(
+        JSON.stringify({ error: 'notebook_id is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate notebook_id is a valid UUID format (early exit per js-early-exit)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(notebook_id)) {
+      return new Response(
+        JSON.stringify({ error: 'notebook_id must be a valid UUID' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Use the verified user ID from JWT, NEVER from the request body (security!)
     const user_id = user!.id;
-    
-    console.log('Received message:', { session_id, message, user_id });
+
+    // Construct composite session_id server-side (DA-6 architecture)
+    // NEVER let the frontend construct this — prevents session_id spoofing
+    const session_id = `${notebook_id}:${user_id}`;
+
+    // Membership check: verify user has role in notebook via service-role query
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Note: We check notebook_members directly instead of using get_notebook_role()
+    // because service_role bypasses RLS making auth.uid() null.
+    const { data: memberCheck, error: memberError } = await supabaseAdmin
+      .from('notebook_members')
+      .select('role')
+      .eq('notebook_id', notebook_id)
+      .eq('user_id', user_id)
+      .eq('status', 'accepted')
+      .maybeSingle();
+
+    // Also check if user is the notebook owner
+    const { data: ownerCheck } = await supabaseAdmin
+      .from('notebooks')
+      .select('user_id')
+      .eq('id', notebook_id)
+      .maybeSingle();
+
+    // Check if the user is a global admin
+    const { data: profileCheck } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user_id)
+      .maybeSingle();
+
+    const isAdmin = profileCheck?.role === 'admin';
+    const isOwner = ownerCheck?.user_id === user_id;
+    const isMember = !!memberCheck;
+    const memberRole = isAdmin ? 'admin' : (isOwner ? 'owner' : memberCheck?.role);
+
+    if (!isAdmin && !isOwner && !isMember) {
+      return new Response(
+        JSON.stringify({ error: 'You do not have access to this notebook' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify role allows chatting (owner, editor — not viewer)
+    if (memberRole === 'viewer') {
+      return new Response(
+        JSON.stringify({ error: 'Viewers cannot send chat messages' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Received message:', { session_id, message, user_id, role: memberRole });
 
     // Get the webhook URL and auth header from environment
     const webhookUrl = Deno.env.get('NOTEBOOK_CHAT_URL');
@@ -49,7 +121,7 @@ serve(async (req) => {
           'Authorization': webhookAuthHeader,
         },
         body: JSON.stringify({
-          session_id,
+          session_id,  // Composite format: {notebookId}:{userId} — n8n uses this key
           message,
           user_id,
           timestamp: new Date().toISOString()
@@ -108,4 +180,3 @@ serve(async (req) => {
     );
   }
 });
-

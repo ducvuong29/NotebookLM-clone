@@ -45,18 +45,17 @@ admin-diff*.txt
 lint*.txt
 *.sqlite
 *.sqlite-journal
-# Supabase Temporary Files
-supabase/.branches/
-supabase/.temp/
+.gitnexus
 
-# AI Agent and Local Output
+# AI Agent Output and Local Configs
 .agent/
 .agents/
 .claude/
-.gitnexus/
 .serena/
 AGENTS.md
 CLAUDE.md
 _bmad-output/
 _bmad/
 skills-lock.json
+temp_*.txt
+supabase/.branches/

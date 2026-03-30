@@ -1,0 +1,21 @@
+-- ============================================================================
+-- EPIC 4b — Invitation Expired Status Extension
+-- Applied: 2026-03-29
+--
+-- Story 4b.3: Invitation Notifications & Dashboard Banner
+--
+-- Changes:
+--   1. ADD 'expired' value to invitation_status ENUM
+--
+-- Notes:
+--   - ALTER TYPE ... ADD VALUE cannot run inside a transaction block in PG < 12
+--   - Postgres 15+ (Supabase) supports IF NOT EXISTS for idempotent migration
+--   - Postgres cannot remove ENUM values — rollback documents this limitation
+--
+-- Rollback: rollbacks/20260329190000_epic4b_invitation_expired_status_rollback.sql
+-- ============================================================================
+
+-- Extend invitation_status ENUM with 'expired' value
+-- This value is used for lazy expiration: invitations older than 14 days
+-- are marked 'expired' on dashboard load rather than via a cron job.
+ALTER TYPE invitation_status ADD VALUE IF NOT EXISTS 'expired';

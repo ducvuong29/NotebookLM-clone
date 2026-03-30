@@ -12,16 +12,21 @@ import NoteEditor from './NoteEditor';
 import AudioPlayer from './AudioPlayer';
 import { Citation } from '@/types/message';
 
+
 interface StudioSidebarProps {
   notebookId?: string;
   isExpanded?: boolean;
   onCitationClick?: (citation: Citation) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 const StudioSidebar = ({
   notebookId,
   isExpanded,
-  onCitationClick
+  onCitationClick,
+  canEdit = true,
+  canDelete = true,
 }: StudioSidebarProps) => {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
@@ -55,6 +60,8 @@ const StudioSidebar = ({
   const notebook = notebooks?.find(n => n.id === notebookId);
   const hasValidAudio = notebook?.audio_overview_url && !checkAudioExpiry(notebook.audio_url_expires_at);
   const currentStatus = generationStatus || notebook?.audio_overview_generation_status;
+  
+  // Permission booleans received via props from Notebook.tsx (H-3 centralization)
   
   // Check if at least one source has been successfully processed
   const hasProcessedSource = sources?.some(source => source.processing_status === 'completed') || false;
@@ -207,7 +214,15 @@ const StudioSidebar = ({
 
   if (isEditingMode) {
     return <div className="w-full bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
-        <NoteEditor note={editingNote || undefined} onSave={handleSaveNote} onDelete={editingNote ? handleDeleteNote : undefined} onCancel={handleCancel} isLoading={isCreating || isUpdating || isDeleting} onCitationClick={onCitationClick} />
+        <NoteEditor 
+          note={editingNote || undefined} 
+          onSave={handleSaveNote} 
+          onDelete={editingNote && canDelete ? handleDeleteNote : undefined} 
+          onCancel={handleCancel} 
+          isLoading={isCreating || isUpdating || isDeleting} 
+          onCitationClick={onCitationClick} 
+          readOnly={!canEdit}
+        />
       </div>;
   }
 
@@ -266,7 +281,12 @@ const StudioSidebar = ({
                 </div>}
               
               <div className="flex space-x-2">
-                <Button size="sm" onClick={handleGenerateAudio} disabled={isGenerating || currentStatus === 'generating' || !hasProcessedSource || isAutoRefreshing} className="flex-1 text-white bg-slate-900 hover:bg-slate-800">
+                <Button 
+                  size="sm" 
+                  onClick={handleGenerateAudio} 
+                  disabled={isGenerating || currentStatus === 'generating' || !hasProcessedSource || isAutoRefreshing || !canEdit} 
+                  className="flex-1 text-white bg-slate-900 hover:bg-slate-800"
+                >
                   {isGenerating || currentStatus === 'generating' ? <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Đang tạo...
@@ -280,13 +300,14 @@ const StudioSidebar = ({
         <div className="mb-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-medium text-foreground">Ghi chú</h3>
-            
           </div>
           
-          <Button variant="outline" size="sm" className="w-full mb-4" onClick={handleCreateNote}>
-            <Plus className="h-4 w-4 mr-2" />
-            Thêm ghi chú
-          </Button>
+          {canEdit && (
+            <Button variant="outline" size="sm" className="w-full mb-4" onClick={handleCreateNote}>
+              <Plus className="h-4 w-4 mr-2" />
+              Thêm ghi chú
+            </Button>
+          )}
         </div>
       </div>
 
@@ -313,9 +334,11 @@ const StudioSidebar = ({
                         {new Date(note.updated_at).toLocaleDateString()}
                       </p>
                     </div>
-                    {note.source_type === 'user' && <Button aria-label="Chỉnh sửa ghi chú" variant="ghost" size="sm" className="ml-2 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 p-0 md:px-3">
+                    {note.source_type === 'user' && canEdit && (
+                      <Button aria-label="Chỉnh sửa" variant="ghost" size="sm" className="ml-2 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 p-0 md:px-3">
                         <Edit className="h-4 w-4 md:h-3 md:w-3" />
-                      </Button>}
+                      </Button>
+                    )}
                   </div>
                 </Card>)}
             </div> : <div className="text-center py-8">

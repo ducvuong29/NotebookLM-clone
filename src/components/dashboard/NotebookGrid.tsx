@@ -18,12 +18,13 @@ const NotebookGrid = () => {
   const { user } = useAuth();
 
   // Derive formatted + split notebooks during render (rerender-derived-state-no-effect)
-  // Single pass: format + partition into public/private (js-combine-iterations)
-  const { publicNotebooks, privateNotebooks } = useMemo(() => {
-    if (!notebooks) return { publicNotebooks: [], privateNotebooks: [] };
+  // Single pass: format + partition into public/private/shared
+  const { publicNotebooks, privateNotebooks, sharedNotebooks } = useMemo(() => {
+    if (!notebooks) return { publicNotebooks: [], privateNotebooks: [], sharedNotebooks: [] };
 
     const publicList: FormattedNotebook[] = [];
     const privateList: FormattedNotebook[] = [];
+    const sharedList: FormattedNotebook[] = [];
 
     for (const notebook of notebooks) {
       const formatted: FormattedNotebook = {
@@ -38,20 +39,22 @@ const NotebookGrid = () => {
         sources: notebook.sources?.[0]?.count || 0,
         icon: notebook.icon || '📝',
         color: notebook.color || 'bg-gray-100',
-        visibility: notebook.visibility || 'private',
+        visibility: (notebook.visibility as 'public' | 'private') || 'private',
         canDelete: notebook.user_id === user?.id,
       };
 
       // Public section = notebooks with visibility 'public' AND owned by OTHER users
-      // Owner's own public notebooks appear in their private section (they own them)
       if (notebook.visibility === 'public' && notebook.user_id !== user?.id) {
         publicList.push({ ...formatted, canDelete: false });
+      } else if (notebook.user_id !== user?.id) {
+        // Shared section = private notebooks owned by other users
+        sharedList.push({ ...formatted, canDelete: false });
       } else {
         privateList.push(formatted);
       }
     }
 
-    return { publicNotebooks: publicList, privateNotebooks: privateList };
+    return { publicNotebooks: publicList, privateNotebooks: privateList, sharedNotebooks: sharedList };
   }, [notebooks, user?.id]);
 
   const handleCreateNotebook = () => {
@@ -102,6 +105,17 @@ const NotebookGrid = () => {
         onNotebookClick={handleNotebookClick}
         variant="public"
       />
+
+      {/* Shared Notebooks Section */}
+      {sharedNotebooks.length > 0 && (
+        <NotebookSection
+          title="Được chia sẻ với tôi"
+          notebooks={sharedNotebooks}
+          emptyMessage="Chưa có notebook nào được chia sẻ với bạn"
+          onNotebookClick={handleNotebookClick}
+          variant="shared"
+        />
+      )}
 
       {/* Private Notebooks Section */}
       <NotebookSection

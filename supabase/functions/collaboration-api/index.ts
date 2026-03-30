@@ -101,52 +101,18 @@ async function handleInviteMember(
     return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền thực hiện thao tác này')
   }
 
-  // Find user by email using auth.admin API
-  const { data: usersResult, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
-    perPage: 1,
-  })
+  // OPTIMIZATION: Query the public.profiles table directly (O(1) instead of O(N) auth scanning)
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .ilike('email', email)
+    .single()
 
-  if (usersError) {
-    console.error('[collaboration-api] listUsers error:', usersError)
-    return errorResponse(500, 'INTERNAL_ERROR', 'Đã xảy ra lỗi hệ thống')
-  }
-
-  // Search through all users to find by email (auth API doesn't support email filter directly)
-  // Use a targeted approach: list users and filter, or use a more efficient method
-  let targetUserId: string | null = null
-
-  // More efficient: query profiles + auth to find user by email
-  // The auth.admin API doesn't have a getByEmail, so we use listUsers with pagination
-  // For better performance, do a paginated search
-  let page = 1
-  const perPage = 100
-  let found = false
-
-  while (!found) {
-    const { data: batch, error: batchError } = await supabaseAdmin.auth.admin.listUsers({
-      page,
-      perPage,
-    })
-
-    if (batchError || !batch.users || batch.users.length === 0) break
-
-    const matchedUser = batch.users.find(
-      (u: { email?: string }) => u.email?.toLowerCase() === email.toLowerCase()
-    )
-
-    if (matchedUser) {
-      targetUserId = matchedUser.id
-      found = true
-    }
-
-    // If we got fewer than perPage results, we've reached the end
-    if (batch.users.length < perPage) break
-    page++
-  }
-
-  if (!targetUserId) {
+  if (profileError || !profile) {
     return errorResponse(404, 'USER_NOT_FOUND', 'Không tìm thấy người dùng với email này')
   }
+
+  const targetUserId = profile.id
 
   // Cannot invite yourself
   if (targetUserId === callerId) {
@@ -220,7 +186,7 @@ async function handleRespondInvitation(
   // Lookup the invitation
   const { data: member, error: fetchError } = await supabaseAdmin
     .from('notebook_members')
-    .select('id, user_id, status')
+    .select('id, user_id, status, created_at')
     .eq('id', member_id)
     .single()
 
@@ -236,6 +202,18 @@ async function handleRespondInvitation(
   // Check invitation hasn't already been responded to
   if (member.status !== 'pending') {
     return errorResponse(400, 'ALREADY_RESPONDED', 'Lời mời đã được phản hồi trước đó')
+  }
+
+  // SECURITY: Enforce 14-day expiration rule server-side
+  const expiryThreshold = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+  if (member.created_at < expiryThreshold) {
+    // Opportunistically mark as expired
+    await supabaseAdmin
+      .from('notebook_members')
+      .update({ status: 'expired' })
+      .eq('id', member_id)
+      
+    return errorResponse(400, 'EXPIRED', 'Lời mời đã hết hạn')
   }
 
   // SECURITY-CRITICAL: ONLY update 'status', NEVER 'role'
@@ -452,34 +430,16 @@ async function handleListMembers(
   }
 
   // Batch-load profiles — collect user_ids, single .in() query (anti N+1)
+  // OPTIMIZATION: Included email in the select to avoid N+1 auth admin API queries
   const userIds = members.map((m: { user_id: string }) => m.user_id)
   const { data: profiles } = await supabaseAdmin
     .from('profiles')
-    .select('id, full_name')
+    .select('id, full_name, email')
     .in('id', userIds)
 
-  const profileMap = new Map<string, { full_name: string | null }>(
-    (profiles ?? []).map((p: { id: string; full_name: string | null }) => [p.id, p])
+  const profileMap = new Map<string, { full_name: string | null, email: string | null }>(
+    (profiles ?? []).map((p: { id: string; full_name: string | null, email: string | null }) => [p.id, p])
   )
-
-  // Batch-load emails from auth admin API
-  const emailMap = new Map<string, string>()
-
-  // Fetch in batches of 20 to handle large member lists without overwhelming the database
-  for (let i = 0; i < userIds.length; i += 20) {
-    const batch = userIds.slice(i, i + 20)
-    
-    // Fetch users in parallel for this batch
-    const userPromises = batch.map((id: string) => supabaseAdmin.auth.admin.getUserById(id))
-    const results = await Promise.all(userPromises)
-    
-    // Process results
-    results.forEach((res: any, index: number) => {
-      if (!res.error && res.data?.user?.email) {
-        emailMap.set(batch[index], res.data.user.email)
-      }
-    })
-  }
 
   // Merge data
   const memberItems: MemberItem[] = members.map(
@@ -490,7 +450,7 @@ async function handleListMembers(
         user_id: m.user_id,
         role: m.role,
         status: m.status,
-        email: emailMap.get(m.user_id) ?? null,
+        email: profile?.email ?? null,
         full_name: profile?.full_name ?? null,
         invited_by: m.invited_by,
         created_at: m.created_at,
@@ -511,22 +471,16 @@ async function handleListMembers(
       const ownerProfile = profileMap.get(notebook.user_id)
       // If owner profile wasn't in the batch, fetch it
       let ownerFullName = ownerProfile?.full_name ?? null
-      let ownerEmail = emailMap.get(notebook.user_id) ?? null
+      let ownerEmail = ownerProfile?.email ?? null
 
       if (!ownerProfile) {
         const { data: ownerProf } = await supabaseAdmin
           .from('profiles')
-          .select('full_name')
+          .select('full_name, email')
           .eq('id', notebook.user_id)
           .single()
         ownerFullName = ownerProf?.full_name ?? null
-      }
-
-      if (!ownerEmail) {
-        // Try to find owner's email from already-fetched auth data
-        // or skip — the owner info is supplementary
-        const { data: ownerAuth } = await supabaseAdmin.auth.admin.getUserById(notebook.user_id)
-        ownerEmail = ownerAuth?.user?.email ?? null
+        ownerEmail = ownerProf?.email ?? null
       }
 
       memberItems.unshift({
@@ -548,6 +502,58 @@ async function handleListMembers(
     members: memberItems,
     notebook_id,
   })
+}
+
+// ============================================================================
+// Action: expire_invitations
+// Called lazily by frontend to mark old pending invitations as 'expired'
+// SECURITY: Only expires invitations belonging to the calling user
+// ============================================================================
+
+interface ExpireInvitationsResponseData {
+  expired_count: number
+}
+
+async function handleExpireInvitations(
+  body: { member_ids?: string[] },
+  supabaseAdmin: ReturnType<typeof createClient>,
+  callerId: string
+): Promise<Response> {
+  const { member_ids } = body
+
+  if (!member_ids || !Array.isArray(member_ids) || member_ids.length === 0) {
+    return errorResponse(400, 'INVALID_INPUT', 'Vui lòng nhập đầy đủ thông tin')
+  }
+
+  // Cap batch size to prevent abuse
+  if (member_ids.length > 50) {
+    return errorResponse(400, 'BATCH_TOO_LARGE', 'Quá nhiều lời mời để xử lý')
+  }
+
+  // SECURITY: Only update invitations that:
+  // 1. Belong to the calling user
+  // 2. Are currently 'pending'
+  // 3. Were created MORE than 14 days ago (server-side date check — authoritative checkpoint)
+  const expiryThreshold = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: updated, error: updateError } = await supabaseAdmin
+    .from('notebook_members')
+    .update({ status: 'expired' })
+    .in('id', member_ids)
+    .eq('user_id', callerId)
+    .eq('status', 'pending')
+    .lt('created_at', expiryThreshold)
+    .select('id')
+
+  if (updateError) {
+    console.error('[collaboration-api] expire_invitations error:', updateError)
+    return errorResponse(500, 'INTERNAL_ERROR', 'Đã xảy ra lỗi hệ thống')
+  }
+
+  const expiredCount = updated?.length ?? 0
+  console.log('[collaboration-api] Expired invitations:', { count: expiredCount, user_id: callerId })
+
+  return successResponse<ExpireInvitationsResponseData>({ expired_count: expiredCount })
 }
 
 // ============================================================================
@@ -603,6 +609,9 @@ serve(async (req: Request) => {
 
       case 'list_members':
         return await handleListMembers(body, supabaseAdmin, user.id)
+
+      case 'expire_invitations':
+        return await handleExpireInvitations(body, supabaseAdmin, user.id)
 
       default:
         return errorResponse(400, 'INVALID_ACTION', 'Hành động không hợp lệ')

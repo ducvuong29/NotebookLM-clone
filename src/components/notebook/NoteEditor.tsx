@@ -16,9 +16,10 @@ interface NoteEditorProps {
   onCancel: () => void;
   isLoading?: boolean;
   onCitationClick?: (citation: Citation) => void;
+  readOnly?: boolean;
 }
 
-const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationClick }: NoteEditorProps) => {
+const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationClick, readOnly }: NoteEditorProps) => {
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
   // AI response notes should NEVER be in edit mode - they're read-only
@@ -39,6 +40,7 @@ const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationCli
   };
 
   const handleEdit = () => {
+    if (readOnly) return;
     // Only allow editing of user notes, not AI responses
     if (note?.source_type === 'ai_response') {
       console.log('NoteEditor: Cannot edit AI response note');
@@ -106,7 +108,7 @@ const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationCli
               {isAIResponse ? 'AI Response' : 'Note'}
             </h3>
             <div className="flex items-center space-x-2">
-              {!isAIResponse && (
+              {!isAIResponse && !readOnly && (
                 <Button variant="ghost" size="sm" onClick={handleEdit}>
                   Edit
                 </Button>

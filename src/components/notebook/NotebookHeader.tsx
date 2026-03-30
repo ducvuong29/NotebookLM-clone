@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { User, LogOut, ArrowLeft } from 'lucide-react';
@@ -13,21 +13,47 @@ import {
 import { useLogout } from '@/services/authService';
 import Logo from '@/components/ui/Logo';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import PermissionBadge from './PermissionBadge';
+import { Users } from 'lucide-react';
+import CollaborationErrorBoundary from './CollaborationErrorBoundary';
+import { useNotebookMembers } from '@/hooks/useCollaborationApi';
+
+const MemberPanel = React.lazy(() => import('./MemberPanel'));
+
 
 interface NotebookHeaderProps {
   title: string;
   notebookId?: string;
+  notebookOwnerId?: string;
+  // Permission props — derived from useNotebookPermissions in Notebook.tsx
+  role?: string | null;
+  canEdit?: boolean;
+  canInvite?: boolean;
+  isMember?: boolean;
 }
 
-const NotebookHeader = ({ title, notebookId }: NotebookHeaderProps) => {
+const NotebookHeader = ({
+  title,
+  notebookId,
+  notebookOwnerId,
+  role = null,
+  canEdit = true,
+  canInvite = false,
+  isMember = false,
+}: NotebookHeaderProps) => {
   const navigate = useNavigate();
   const { logout } = useLogout();
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(title);
   const { updateNotebook, isUpdating } = useNotebookUpdate();
+  const [isMemberPanelOpen, setIsMemberPanelOpen] = useState(false);
+  
+  // Member count — uses TanStack Query dedup (same key as Notebook.tsx's useNotebookPermissions)
+  const { data: members } = useNotebookMembers(notebookId);
+  const memberCount = members?.length ?? 0;
 
   const handleTitleClick = () => {
-    if (notebookId) {
+    if (notebookId && canEdit) {
       setIsEditing(true);
       setEditedTitle(title);
     }
@@ -90,18 +116,51 @@ const NotebookHeader = ({ title, notebookId }: NotebookHeaderProps) => {
                 disabled={isUpdating}
               />
             ) : (
-              <span 
-                className="text-lg font-medium text-foreground cursor-pointer hover:bg-muted rounded px-2 py-1 transition-colors"
-                onClick={handleTitleClick}
-              >
-                {title}
-              </span>
+              <div className="flex items-center space-x-3">
+                <span 
+                  className={`text-lg font-medium text-foreground ${canEdit ? 'cursor-pointer hover:bg-muted' : 'cursor-default'} rounded px-2 py-1 transition-colors`}
+                  onClick={handleTitleClick}
+                >
+                  {title}
+                </span>
+                <PermissionBadge role={role} />
+              </div>
             )}
           </div>
         </div>
         
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
+            {/* Allow all members to see the MemberPanel to view the list of members */}
+            {isMember && notebookId && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsMemberPanelOpen(true)}
+                className="hidden md:flex"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Thành viên
+                {/* AC #7: Member count badge next to Share button */}
+                {memberCount > 1 && (
+                  <span className="ml-1.5 bg-primary/10 text-primary text-xs font-medium rounded-full px-1.5 min-w-[20px] text-center">
+                    {memberCount}
+                  </span>
+                )}
+              </Button>
+            )}
+            {isMemberPanelOpen && notebookId && (
+              <CollaborationErrorBoundary>
+                <Suspense fallback={null}>
+                  <MemberPanel 
+                    notebookId={notebookId}
+                    notebookOwnerId={notebookOwnerId}
+                    isOpen={isMemberPanelOpen}
+                    onOpenChange={setIsMemberPanelOpen}
+                  />
+                </Suspense>
+              </CollaborationErrorBoundary>
+            )}
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
