@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -10,6 +10,12 @@ export const useAudioOverview = (notebookId?: string) => {
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // BUG-05 fix: toast creates a new ref every render → putting it in useEffect deps
+  // causes subscribe/unsubscribe churn on every render, exhausting Realtime connections.
+  // useRef lets callbacks access the latest toast without re-triggering the effect.
+  const toastRef = useRef(toast);
+  useEffect(() => { toastRef.current = toast; }, [toast]);
 
   // Set up realtime subscription for notebook updates
   useEffect(() => {
@@ -27,14 +33,14 @@ export const useAudioOverview = (notebookId?: string) => {
         },
         (payload) => {
           console.log('Notebook updated:', payload);
-          const newData = payload.new as any;
+          const newData = payload.new as any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
           
           if (newData.audio_overview_generation_status) {
             setGenerationStatus(newData.audio_overview_generation_status);
             
             if (newData.audio_overview_generation_status === 'completed' && newData.audio_overview_url) {
               setIsGenerating(false);
-              toast({
+              toastRef.current({
                 title: "Tổng quan Âm thanh đã sẵn sàng!",
                 description: "Cuộc trò chuyện chuyên sâu đã sẵn sàng để phát!",
               });
@@ -43,7 +49,7 @@ export const useAudioOverview = (notebookId?: string) => {
               queryClient.invalidateQueries({ queryKey: ['notebooks'] });
             } else if (newData.audio_overview_generation_status === 'failed') {
               setIsGenerating(false);
-              toast({
+              toastRef.current({
                 title: "Tạo thất bại",
                 description: "Không thể tạo tổng quan âm thanh. Vui lòng thử lại.",
                 variant: "destructive",
@@ -57,7 +63,7 @@ export const useAudioOverview = (notebookId?: string) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [notebookId, toast, queryClient]);
+  }, [notebookId, queryClient]);
 
   const generateAudioOverview = useMutation({
     mutationFn: async (notebookId: string) => {

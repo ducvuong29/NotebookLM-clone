@@ -11,7 +11,6 @@ export const useNotebookDelete = () => {
 
   const deleteNotebook = useMutation({
     mutationFn: async (notebookId: string) => {
-      console.log('Starting notebook deletion process for:', notebookId);
       
       try {
         // First, get the notebook details for better error reporting
@@ -26,12 +25,11 @@ export const useNotebookDelete = () => {
           throw new Error('Failed to find notebook');
         }
 
-        console.log('Found notebook to delete:', notebook.title);
 
         // Get all sources for this notebook to delete their files
         const { data: sources, error: sourcesError } = await supabase
           .from('sources')
-          .select('id, title, file_path, type')
+          .select('id, file_path')
           .eq('notebook_id', notebookId);
 
         if (sourcesError) {
@@ -39,30 +37,36 @@ export const useNotebookDelete = () => {
           throw new Error('Failed to fetch sources for cleanup');
         }
 
-        console.log(`Found ${sources?.length || 0} sources to clean up`);
-
-        // Delete all files from storage for sources that have file_path
+        // Delete source files from storage
         const filesToDelete = sources?.filter(source => source.file_path).map(source => source.file_path) || [];
         
         if (filesToDelete.length > 0) {
-          console.log('Deleting files from storage:', filesToDelete);
-          
           const { error: storageError } = await supabase.storage
             .from('sources')
             .remove(filesToDelete);
 
           if (storageError) {
-            console.error('Error deleting files from storage:', storageError);
-            // Don't throw here - we still want to delete the notebook
-            // even if some files can't be deleted (they might already be gone)
-          } else {
-            console.log('All files deleted successfully from storage');
+            console.error('Error deleting source files from storage:', storageError);
           }
-        } else {
-          console.log('No files to delete from storage (URL-based sources or no file_paths)');
         }
 
-        // Delete the notebook - this will cascade delete all sources
+        // Delete audio files from storage (audio bucket uses notebookId as folder)
+        const { data: audioFiles } = await supabase.storage
+          .from('audio')
+          .list(notebookId);
+
+        if (audioFiles && audioFiles.length > 0) {
+          const audioPaths = audioFiles.map(f => `${notebookId}/${f.name}`);
+          const { error: audioError } = await supabase.storage
+            .from('audio')
+            .remove(audioPaths);
+
+          if (audioError) {
+            console.error('Error deleting audio files from storage:', audioError);
+          }
+        }
+
+        // Delete the notebook - this will cascade delete all sources, notes, etc.
         const { error: deleteError } = await supabase
           .from('notebooks')
           .delete()
@@ -73,7 +77,6 @@ export const useNotebookDelete = () => {
           throw deleteError;
         }
         
-        console.log('Notebook deleted successfully with cascade deletion');
         return notebook;
       } catch (error) {
         console.error('Error in deletion process:', error);
@@ -81,7 +84,6 @@ export const useNotebookDelete = () => {
       }
     },
     onSuccess: (deletedNotebook, notebookId) => {
-      console.log('Delete mutation success, invalidating queries');
       
       // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['notebooks', user?.id] });
@@ -94,7 +96,7 @@ export const useNotebookDelete = () => {
         description: `"${deletedNotebook?.title || 'Notebook'}" và toàn bộ nguồn đã được xóa thành công.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
       console.error('Delete mutation error:', error);
       
       let errorMessage = "Không thể xóa notebook. Vui lòng thử lại.";

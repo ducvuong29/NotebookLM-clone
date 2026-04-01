@@ -98,16 +98,16 @@ BEGIN
 
   -- Add members to the PRIVATE notebook
   -- Editor (accepted)
-  INSERT INTO public.notebook_members (notebook_id, user_id, role, status, invited_by)
-  VALUES (v_notebook_id, v_editor_id, 'editor', 'accepted', v_owner_id);
+  INSERT INTO public.notebook_members (notebook_id, user_id, role, invited_by)
+  VALUES (v_notebook_id, v_editor_id, 'editor', v_owner_id);
 
   -- Viewer (accepted)
-  INSERT INTO public.notebook_members (notebook_id, user_id, role, status, invited_by)
-  VALUES (v_notebook_id, v_viewer_id, 'viewer', 'accepted', v_owner_id);
+  INSERT INTO public.notebook_members (notebook_id, user_id, role, invited_by)
+  VALUES (v_notebook_id, v_viewer_id, 'viewer', v_owner_id);
 
   -- Pending member (NOT accepted — should be blocked)
-  INSERT INTO public.notebook_members (notebook_id, user_id, role, status, invited_by)
-  VALUES (v_notebook_id, v_pending_id, 'editor', 'pending', v_owner_id);
+  INSERT INTO public.notebook_members (notebook_id, user_id, role, invited_by)
+  VALUES (v_notebook_id, v_pending_id, 'editor', v_owner_id);
 
   -- Insert a source into the private notebook
   INSERT INTO public.sources (id, notebook_id, title, type)

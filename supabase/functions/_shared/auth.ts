@@ -2,7 +2,7 @@
 // Shared JWT authentication helper for user-facing Edge Functions
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "./cors.ts";
+import { getCorsHeaders } from "./cors.ts";
 
 interface AuthResult {
   user: { id: string; email?: string; [key: string]: unknown } | null;
@@ -23,7 +23,7 @@ export async function authenticateRequest(
         }),
         {
           status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         },
       ),
     };
@@ -49,7 +49,7 @@ export async function authenticateRequest(
         }),
         {
           status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         },
       ),
     };

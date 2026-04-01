@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, MoreVertical, Trash2, Edit, Loader2, CheckCircle, XCircle, Upload } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -36,7 +36,9 @@ const SourcesSidebar = ({
   const [showAddSourcesDialog, setShowAddSourcesDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedSource, setSelectedSource] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedSourceForViewing, setSelectedSourceForViewing] = useState<any>(null);
 
   const {
@@ -51,38 +53,25 @@ const SourcesSidebar = ({
 
   // Permission booleans received via props from Notebook.tsx (H-3 centralization)
 
-  // Get the source content for the selected citation
-  const getSourceContent = (citation: Citation) => {
-    const source = sources?.find(s => s.id === citation.source_id);
-    return source?.content || '';
-  };
+  // [perf] O(1) source lookup Map — replaces 3 separate O(n) .find() calls per render
+  const sourceMap = useMemo(
+    () => new Map((sources ?? []).map(s => [s.id, s])),
+    [sources]
+  );
 
-  // Get the source summary for the selected citation
-  const getSourceSummary = (citation: Citation) => {
-    const source = sources?.find(s => s.id === citation.source_id);
-    return source?.summary || '';
-  };
-
-  // Get the source URL for the selected citation
-  const getSourceUrl = (citation: Citation) => {
-    const source = sources?.find(s => s.id === citation.source_id);
-    return source?.url || '';
-  };
+  // Get source fields via O(1) Map lookup
+  const getSourceContent = (citation: Citation) => sourceMap.get(citation.source_id)?.content || '';
+  const getSourceSummary = (citation: Citation) => sourceMap.get(citation.source_id)?.summary || '';
+  const getSourceUrl = (citation: Citation) => sourceMap.get(citation.source_id)?.url || '';
 
   // Get the source summary for a selected source
-  const getSelectedSourceSummary = () => {
-    return selectedSourceForViewing?.summary || '';
-  };
+  const getSelectedSourceSummary = () => selectedSourceForViewing?.summary || '';
 
-  // Get the source content for a selected source  
-  const getSelectedSourceContent = () => {
-    return selectedSourceForViewing?.content || '';
-  };
+  // Get the source content for a selected source
+  const getSelectedSourceContent = () => selectedSourceForViewing?.content || '';
 
   // Get the source URL for a selected source
-  const getSelectedSourceUrl = () => {
-    return selectedSourceForViewing?.url || '';
-  };
+  const getSelectedSourceUrl = () => selectedSourceForViewing?.url || '';
 
   
   const renderSourceIcon = (type: string) => {
@@ -131,17 +120,17 @@ const SourcesSidebar = ({
     }
   };
 
-  const handleRemoveSource = (source: any) => {
+  const handleRemoveSource = (source: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
     setSelectedSource(source);
     setShowDeleteDialog(true);
   };
 
-  const handleRenameSource = (source: any) => {
+  const handleRenameSource = (source: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
     setSelectedSource(source);
     setShowRenameDialog(true);
   };
 
-  const handleSourceClick = (source: any) => {
+  const handleSourceClick = (source: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
     // Clear any existing citation state first
     if (setSelectedCitation) {
       setSelectedCitation(null);
@@ -161,12 +150,11 @@ const SourcesSidebar = ({
       // Deliberately omitting chunk_lines_from and chunk_lines_to to prevent auto-scroll
     };
 
-    // Set the mock citation after a small delay to ensure state is clean
-    setTimeout(() => {
-      if (setSelectedCitation) {
-        setSelectedCitation(mockCitation);
-      }
-    }, 50);
+    // [perf] React 18 auto-batches all setState calls in an event handler into 1 re-render.
+    // Removed the previous setTimeout(50ms) that caused 50ms perceived lag on every source click.
+    if (setSelectedCitation) {
+      setSelectedCitation(mockCitation);
+    }
   };
 
   const handleBackToSources = () => {

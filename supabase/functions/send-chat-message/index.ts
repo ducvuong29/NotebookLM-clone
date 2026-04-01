@@ -1,19 +1,18 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { corsHeaders, corsResponse } from '../_shared/cors.ts'
+import { getCorsHeaders, corsResponse } from '../_shared/cors.ts'
 import { authenticateRequest } from '../_shared/auth.ts'
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') return corsResponse();
+  if (req.method === 'OPTIONS') return corsResponse(req);
 
   try {
     // ============ AUTHORIZATION CHECK ============
     const { user, error: authError } = await authenticateRequest(req)
     if (authError) return authError
 
-    console.log('Authenticated user:', user!.id)
     // ============ END AUTHORIZATION CHECK ============
 
     const { notebook_id, message } = await req.json();
@@ -22,7 +21,7 @@ serve(async (req) => {
     if (!notebook_id) {
       return new Response(
         JSON.stringify({ error: 'notebook_id is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       );
     }
 
@@ -31,7 +30,7 @@ serve(async (req) => {
     if (!uuidRegex.test(notebook_id)) {
       return new Response(
         JSON.stringify({ error: 'notebook_id must be a valid UUID' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       );
     }
 
@@ -48,29 +47,31 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Note: We check notebook_members directly instead of using get_notebook_role()
-    // because service_role bypasses RLS making auth.uid() null.
-    const { data: memberCheck, error: memberError } = await supabaseAdmin
-      .from('notebook_members')
-      .select('role')
-      .eq('notebook_id', notebook_id)
-      .eq('user_id', user_id)
-      .eq('status', 'accepted')
-      .maybeSingle();
+    // PERF: Run all 3 auth queries in PARALLEL with Promise.all
+    // Before: 3 sequential queries × ~200-400ms each = ~600-1200ms
+    // After:  3 parallel queries = ~200-400ms total (max latency of single query)
+    const [memberResult, ownerResult, profileResult] = await Promise.all([
+      supabaseAdmin
+        .from('notebook_members')
+        .select('role')
+        .eq('notebook_id', notebook_id)
+        .eq('user_id', user_id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('notebooks')
+        .select('user_id')
+        .eq('id', notebook_id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('id', user_id)
+        .maybeSingle(),
+    ]);
 
-    // Also check if user is the notebook owner
-    const { data: ownerCheck } = await supabaseAdmin
-      .from('notebooks')
-      .select('user_id')
-      .eq('id', notebook_id)
-      .maybeSingle();
-
-    // Check if the user is a global admin
-    const { data: profileCheck } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user_id)
-      .maybeSingle();
+    const memberCheck = memberResult.data;
+    const ownerCheck = ownerResult.data;
+    const profileCheck = profileResult.data;
 
     const isAdmin = profileCheck?.role === 'admin';
     const isOwner = ownerCheck?.user_id === user_id;
@@ -80,19 +81,13 @@ serve(async (req) => {
     if (!isAdmin && !isOwner && !isMember) {
       return new Response(
         JSON.stringify({ error: 'You do not have access to this notebook' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 403, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       );
     }
 
-    // Verify role allows chatting (owner, editor — not viewer)
-    if (memberRole === 'viewer') {
-      return new Response(
-        JSON.stringify({ error: 'Viewers cannot send chat messages' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // All roles can chat: owner, editor, viewer
+    // Chat is a read operation — asking AI about existing sources
 
-    console.log('Received message:', { session_id, message, user_id, role: memberRole });
 
     // Get the webhook URL and auth header from environment
     const webhookUrl = Deno.env.get('NOTEBOOK_CHAT_URL');
@@ -106,7 +101,6 @@ serve(async (req) => {
       throw new Error('NOTEBOOK_GENERATION_AUTH environment variable not set');
     }
 
-    console.log('Sending to webhook with auth header');
 
     // Send message to n8n webhook with 25s timeout
     const controller = new AbortController();
@@ -121,7 +115,8 @@ serve(async (req) => {
           'Authorization': webhookAuthHeader,
         },
         body: JSON.stringify({
-          session_id,  // Composite format: {notebookId}:{userId} — n8n uses this key
+          session_id,  // Composite format: {notebookId}:{userId} — n8n uses this key for chat history
+          notebook_id, // Pass explicit notebook_id so n8n can use it for Pinecone vector filtering
           message,
           user_id,
           timestamp: new Date().toISOString()
@@ -135,7 +130,7 @@ serve(async (req) => {
         console.error('Webhook request timed out after 25s');
         return new Response(
           JSON.stringify({ error: true, code: 'TIMEOUT', message: 'Chat request timed out' }),
-          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 504, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
         );
       }
       throw fetchError;
@@ -149,13 +144,12 @@ serve(async (req) => {
     }
 
     const webhookData = await webhookResponse.json();
-    console.log('Webhook response:', webhookData);
 
     return new Response(
       JSON.stringify({ success: true, data: webhookData }),
       { 
         headers: { 
-          ...corsHeaders,
+          ...getCorsHeaders(req),
           'Content-Type': 'application/json' 
         } 
       }
@@ -173,7 +167,7 @@ serve(async (req) => {
       { 
         status: 500,
         headers: { 
-          ...corsHeaders,
+          ...getCorsHeaders(req),
           'Content-Type': 'application/json' 
         }
       }

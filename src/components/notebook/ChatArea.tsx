@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, Upload, FileText, Loader2, RefreshCw, AlertCircle, RotateCcw } from 'lucide-react';
@@ -68,6 +68,8 @@ const ChatArea = ({
   // Chat should be disabled if there are no processed sources
   const isChatDisabled = !hasProcessedSource;
 
+  // [perf] Debug log removed — was calling sources.map() on every render in production
+
   // Track when we send a message to show loading state
   const [lastMessageCount, setLastMessageCount] = useState(0);
 
@@ -84,16 +86,17 @@ const ChatArea = ({
   }, [messages.length, lastMessageCount, pendingUserMessage]);
 
   // Auto-scroll when pending message is set, when messages update, or when AI loading appears
+  // [perf] Use requestAnimationFrame instead of setTimeout(50) — runs after next paint cycle, never double-scrolls
   useEffect(() => {
     if (latestMessageRef.current && scrollAreaRef.current) {
       const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
       if (viewport) {
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           latestMessageRef.current?.scrollIntoView({
             behavior: 'smooth',
             block: 'start'
           });
-        }, 50);
+        });
       }
     }
   }, [pendingUserMessage, messages.length, showAiLoading]);
@@ -160,17 +163,8 @@ const ChatArea = ({
     handleSendMessage(question);
   };
 
-  // Helper function to determine if message is from user
-  const isUserMessage = (msg: any) => {
-    const messageType = msg.message?.type || msg.message?.role;
-    return messageType === 'human' || messageType === 'user';
-  };
-
-  // Helper function to determine if message is from AI
-  const isAiMessage = (msg: any) => {
-    const messageType = msg.message?.type || msg.message?.role;
-    return messageType === 'ai' || messageType === 'assistant';
-  };
+  // [perf] Helper functions REMOVED — isUser/isAi are derived once inside .map() below
+  // (previously called 3 times per message, causing 60+ redundant property accesses per render)
 
   // Get the index of the last message for auto-scrolling
   const shouldShowScrollTarget = () => {
@@ -232,16 +226,24 @@ const ChatArea = ({
 
                 {/* Chat Messages */}
                 {(messages.length > 0 || pendingUserMessage || showAiLoading) && <div className="mb-6 space-y-4">
-                    {messages.map((msg, index) => <div key={msg.id} className={`flex ${isUserMessage(msg) ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`${isUserMessage(msg) ? 'max-w-xs lg:max-w-md px-4 py-2 bg-blue-500 text-white rounded-lg' : 'w-full'}`}>
-                          <div className={isUserMessage(msg) ? '' : 'prose prose-gray dark:prose-invert max-w-none text-foreground'}>
-                            <MarkdownRenderer content={msg.message.content} className={isUserMessage(msg) ? '' : ''} onCitationClick={handleCitationClick} selectedCitation={selectedCitation} isUserMessage={isUserMessage(msg)} />
+                    {messages.map((msg) => {
+                        // [perf] Derive once per message — was calling isUserMessage() 3x and isAiMessage() 1x before
+                        const messageType = msg.message?.type || msg.message?.role;
+                        const isUser = messageType === 'human' || messageType === 'user';
+                        const isAi = messageType === 'ai' || messageType === 'assistant';
+                        return (
+                          <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`${isUser ? 'max-w-xs lg:max-w-md px-4 py-2 bg-blue-500 text-white rounded-lg' : 'w-full'}`}>
+                              <div className={isUser ? '' : 'prose prose-gray dark:prose-invert max-w-none text-foreground'}>
+                                <MarkdownRenderer content={msg.message.content} className={isUser ? '' : ''} onCitationClick={handleCitationClick} selectedCitation={selectedCitation} isUserMessage={isUser} />
+                              </div>
+                              {isAi && <div className="mt-2 flex justify-start">
+                                  <SaveToNoteButton content={msg.message.content} notebookId={notebookId} />
+                                </div>}
+                            </div>
                           </div>
-                          {isAiMessage(msg) && <div className="mt-2 flex justify-start">
-                              <SaveToNoteButton content={msg.message.content} notebookId={notebookId} />
-                            </div>}
-                        </div>
-                      </div>)}
+                        );
+                      })}
                     
                     {/* Pending user message */}
                     {pendingUserMessage && <div className="flex justify-end">

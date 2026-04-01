@@ -1,27 +1,20 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { getCorsHeaders, corsResponse } from '../_shared/cors.ts'
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return corsResponse(req);
 
   try {
     const body = await req.json()
-    console.log('Audio generation callback received:', body)
     
     const { notebook_id, audio_url, status, error } = body
     
     if (!notebook_id) {
       return new Response(
         JSON.stringify({ error: 'Notebook ID is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       )
     }
 
@@ -49,7 +42,6 @@ serve(async (req) => {
         throw updateError
       }
 
-      console.log('Audio overview completed successfully for notebook:', notebook_id)
     } else {
       // Update notebook with failed status
       const { error: updateError } = await supabase
@@ -64,14 +56,13 @@ serve(async (req) => {
         throw updateError
       }
 
-      console.log('Audio generation failed for notebook:', notebook_id, 'Error:', error)
     }
 
     return new Response(
       JSON.stringify({ success: true }),
       { 
         status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } 
       }
     )
 
@@ -83,7 +74,7 @@ serve(async (req) => {
       }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } 
       }
     )
   }

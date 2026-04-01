@@ -53,8 +53,8 @@ export function MemberPanel({ notebookId, notebookOwnerId, isOpen, onOpenChange 
     removeMember({ notebook_id: notebookId, member_id: memberId });
   };
 
-  // Only notebook owner or admins can modify roles/remove
-  const canModifyMembers = isOwner || myRole === 'admin';
+  // Only notebook owner can modify roles/remove
+  const canModifyMembers = isOwner;
 
   return (
     <>
@@ -134,12 +134,6 @@ function MemberRow({ member, canModify, onRoleChange, onRemove, isBusy }: Member
           <p className="text-sm font-medium leading-none">{displayName}</p>
           <p className="text-xs text-muted-foreground mt-1 cursor-default">
             {member.email && <span className="mr-2">{member.email}</span>}
-            <span
-              className={member.status === 'pending' ? 'text-orange-500' : ''}
-              aria-label={`Trạng thái: ${member.status === 'pending' ? 'Đang chờ' : 'Đã tham gia'}`}
-            >
-              {member.status === 'pending' ? 'Đang chờ xác nhận' : 'Đã tham gia'}
-            </span>
           </p>
         </div>
       </div>

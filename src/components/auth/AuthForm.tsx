@@ -55,7 +55,7 @@ const AuthForm = () => {
         title: "Đã gửi mã OTP!",
         description: "Vui lòng kiểm tra email của bạn để lấy mã đăng nhập 8 số.",
       });
-    } catch (error: any) {
+    } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       toast({
         title: "Lỗi gửi mã",
         description: error.message || "Không thể gửi mã OTP. Vui lòng thử lại.",
@@ -94,7 +94,7 @@ const AuthForm = () => {
         title: "Chào mừng trở lại!",
         description: "Đăng nhập thành công.",
       });
-    } catch (error: any) {
+    } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       toast({
         title: "Lỗi xác thực",
         description: "Mã OTP không đúng hoặc đã hết hạn. Thử lại.",

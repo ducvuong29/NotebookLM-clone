@@ -38,6 +38,12 @@ export const useFileUpload = () => {
       const result = await new Promise<string>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
 
+        // BUG-12 fix: 2-minute timeout for file uploads.
+        // Without this, XHR hangs indefinitely when network stalls
+        // (corporate proxies, firewalls, connection drops).
+        // The spinner stays forever — user must manually refresh.
+        xhr.timeout = 120000; // 2 minutes
+
         xhr.upload.addEventListener('progress', (event) => {
           if (event.lengthComputable) {
             const percent = Math.round((event.loaded / event.total) * 100);
@@ -63,6 +69,11 @@ export const useFileUpload = () => {
         xhr.addEventListener('abort', () => {
           setUploadStatus('error');
           reject(new Error('Upload was aborted'));
+        });
+
+        xhr.addEventListener('timeout', () => {
+          setUploadStatus('error');
+          reject(new Error('Upload timed out after 2 minutes. Please check your connection and try again.'));
         });
 
         xhr.open('POST', uploadUrl);

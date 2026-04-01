@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MoreVertical, Plus, Edit, Bot, User, Loader2, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { MoreVertical, Plus, Edit, Bot, User, Loader2, AlertCircle, CheckCircle2, RefreshCw, Activity, ChevronRight } from 'lucide-react';
 import { useNotes, Note } from '@/hooks/useNotes';
 import { useAudioOverview } from '@/hooks/useAudioOverview';
 import { useNotebooks } from '@/hooks/useNotebooks';
@@ -12,6 +13,9 @@ import NoteEditor from './NoteEditor';
 import AudioPlayer from './AudioPlayer';
 import { Citation } from '@/types/message';
 
+// Lazy-load ActivityPanel — only downloaded when user opens it
+const ActivityPanel = lazy(() => import('./ActivityPanel'));
+
 
 interface StudioSidebarProps {
   notebookId?: string;
@@ -19,6 +23,7 @@ interface StudioSidebarProps {
   onCitationClick?: (citation: Citation) => void;
   canEdit?: boolean;
   canDelete?: boolean;
+  isMember?: boolean;
 }
 
 const StudioSidebar = ({
@@ -27,10 +32,20 @@ const StudioSidebar = ({
   onCitationClick,
   canEdit = true,
   canDelete = true,
+  isMember = false,
 }: StudioSidebarProps) => {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [audioError, setAudioError] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [hasLoadedActivity, setHasLoadedActivity] = useState(false);
+
+  useEffect(() => {
+    if (activityOpen && !hasLoadedActivity) {
+      setHasLoadedActivity(true);
+    }
+  }, [activityOpen, hasLoadedActivity]);
+
   const {
     notes,
     isLoading,
@@ -213,7 +228,7 @@ const StudioSidebar = ({
   };
 
   if (isEditingMode) {
-    return <div className="w-full bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden">
+    return <div className="w-full bg-background border-l border-border flex flex-col h-full overflow-hidden">
         <NoteEditor 
           note={editingNote || undefined} 
           onSave={handleSaveNote} 
@@ -259,14 +274,16 @@ const StudioSidebar = ({
                   </div>
                 </div>}
               
-              {/* Status Display */}
-              {getStatusDisplay() && <div className="flex items-center space-x-2 mb-3 p-2 rounded-md bg-transparent">
-                  {getStatusDisplay()!.icon}
+              {/* Status Display — [perf] derived once, was calling getStatusDisplay() 3x before */}
+              {(() => { const statusDisplay = getStatusDisplay(); return statusDisplay && (
+                <div className="flex items-center space-x-2 mb-3 p-2 rounded-md bg-transparent">
+                  {statusDisplay.icon}
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-foreground">{getStatusDisplay()!.text}</p>
-                    <p className="text-xs text-muted-foreground">{getStatusDisplay()!.description}</p>
+                    <p className="text-sm font-medium text-foreground">{statusDisplay.text}</p>
+                    <p className="text-xs text-muted-foreground">{statusDisplay.description}</p>
                   </div>
-                </div>}
+                </div>
+              ); })()}
               
               {/* Audio error div */}
               {audioError && <div className="flex items-center space-x-2 mb-3 p-2 bg-red-50 rounded-md">
@@ -352,6 +369,34 @@ const StudioSidebar = ({
             </div>}
         </div>
       </ScrollArea>
+
+      {/* Activity Log — collapsible, only for members */}
+      {isMember && (
+        <Collapsible open={activityOpen} onOpenChange={setActivityOpen}>
+          <CollapsibleTrigger asChild>
+            <button
+              className="w-full flex items-center gap-2 px-4 py-3 border-t border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            >
+              <Activity className="w-4 h-4" />
+              <span>Hoạt động</span>
+              <ChevronRight className={`w-3.5 h-3.5 ml-auto transition-transform ${activityOpen ? 'rotate-90' : ''}`} />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="max-h-[300px] border-t border-border/50">
+              {hasLoadedActivity && (
+                <Suspense fallback={
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                }>
+                  <ActivityPanel notebookId={notebookId} />
+                </Suspense>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
     </div>;
 };
 

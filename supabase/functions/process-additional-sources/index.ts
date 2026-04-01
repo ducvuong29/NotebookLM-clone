@@ -1,45 +1,18 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { getCorsHeaders, corsResponse } from '../_shared/cors.ts'
+import { authenticateRequest } from '../_shared/auth.ts'
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return corsResponse(req);
 
   try {
     // ============ AUTHORIZATION CHECK ============
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const { user, error: authError } = await authenticateRequest(req)
+    if (authError) return authError
 
-    // Verify user identity using their JWT
-    const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
-
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser()
-    if (userError || !user) {
-      console.error('Auth error:', userError)
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log('Authenticated user:', user.id)
     // ============ END AUTHORIZATION CHECK ============
 
     const { type, notebookId, urls, title, content, timestamp, sourceIds } = await req.json();
@@ -60,19 +33,31 @@ serve(async (req) => {
       console.error('Notebook lookup error:', notebookError)
       return new Response(
         JSON.stringify({ error: 'Notebook not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 404, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       )
     }
 
+    // Check that the user has write access (owner or editor)
     if (notebook.user_id !== user.id) {
-      console.error('User does not own this notebook:', { userId: user.id, ownerId: notebook.user_id })
-      return new Response(
-        JSON.stringify({ error: 'Forbidden - you do not own this notebook' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      // Not the owner — check notebook_members for editor role
+      const { data: memberCheck } = await supabaseClient
+        .from('notebook_members')
+        .select('role')
+        .eq('notebook_id', notebookId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const isEditor = memberCheck?.role === 'editor';
+
+      if (!isEditor) {
+        console.error('User does not have write access:', { userId: user.id, ownerId: notebook.user_id, memberRole: memberCheck?.role })
+        return new Response(
+          JSON.stringify({ error: 'Forbidden - you do not have write access to this notebook' }),
+          { status: 403, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
-    console.log(`Process additional sources received ${type} request for notebook ${notebookId} by user ${user.id}`);
 
     // Get the webhook URL from Supabase secrets
     const webhookUrl = Deno.env.get('ADDITIONAL_SOURCES_WEBHOOK_URL');
@@ -110,7 +95,6 @@ serve(async (req) => {
       throw new Error(`Unsupported type: ${type}`);
     }
 
-    console.log('Sending webhook payload:', JSON.stringify(webhookPayload, null, 2));
 
     // Send to webhook with authentication
     const response = await fetch(webhookUrl, {
@@ -119,7 +103,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
         'Authorization': authToken,
         'ngrok-skip-browser-warning': 'true',
-        ...corsHeaders
+        ...getCorsHeaders(req)
       },
       body: JSON.stringify(webhookPayload)
     });
@@ -131,7 +115,6 @@ serve(async (req) => {
     }
 
     const webhookResponse = await response.text();
-    console.log('Webhook response:', webhookResponse);
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -140,7 +123,7 @@ serve(async (req) => {
     }), {
       headers: { 
         'Content-Type': 'application/json',
-        ...corsHeaders 
+        ...getCorsHeaders(req) 
       },
     });
 
@@ -154,7 +137,7 @@ serve(async (req) => {
       status: 500,
       headers: { 
         'Content-Type': 'application/json',
-        ...corsHeaders 
+        ...getCorsHeaders(req) 
       },
     });
   }

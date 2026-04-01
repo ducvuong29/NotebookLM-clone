@@ -24,9 +24,9 @@ export interface EnhancedChatMessage {
       segments: MessageSegment[];
       citations: Citation[];
     };
-    additional_kwargs?: any;
-    response_metadata?: any;
-    tool_calls?: any[];
-    invalid_tool_calls?: any[];
+    additional_kwargs?: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
+    response_metadata?: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
+    tool_calls?: any /* eslint-disable-line @typescript-eslint/no-explicit-any */[];
+    invalid_tool_calls?: any /* eslint-disable-line @typescript-eslint/no-explicit-any */[];
   };
 }

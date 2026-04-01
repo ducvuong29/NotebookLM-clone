@@ -109,7 +109,7 @@ describe('Epic 1: Chat Resiliency — Manual Retry Logic', () => {
 
   // ── Retry does nothing when there is no failed message ───────────────────
   it('does nothing when retry is pressed but no message failed', () => {
-    let state = createInitialState();
+    const state = createInitialState();
 
     const { state: retryState, retryText } = handleRetry(state);
 

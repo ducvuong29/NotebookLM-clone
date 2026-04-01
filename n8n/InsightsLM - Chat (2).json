@@ -1,0 +1,245 @@
+{
+  "name": "InsightsLM - Chat",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "2fabf43f-6e6e-424b-8e93-9150e9ce7d6c",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        6000,
+        8672
+      ],
+      "id": "8abae3b7-b347-42f4-af90-8b6d79c5c768",
+      "name": "Webhook1",
+      "webhookId": "2fabf43f-6e6e-424b-8e93-9150e9ce7d6c",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "niNSBpzAl6ge5J0I",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.message }}",
+        "options": {
+          "systemMessage": "=You are a document retrieval assistant. You MUST use the retrieve_knowledge tool for EVERY question, then answer based ONLY on retrieved chunks.\n\nCRITICAL: Your response MUST be a valid JSON object. No plain text. No markdown. No code blocks.\n\nResponse format (MANDATORY):\n{\"output\":[{\"text\":\"Your answer here\",\"citations\":[{\"chunk_index\":0,\"chunk_source_id\":\"uuid\",\"chunk_lines_from\":25,\"chunk_lines_to\":50}]}]}\n\nRules:\n1. ALWAYS call retrieve_knowledge tool first\n2. Answer ONLY from retrieved chunks - never from general knowledge\n3. Include ALL relevant citations from chunks you used\n4. If no relevant chunks found, respond: {\"output\":[{\"text\":\"Xin lỗi, tôi không tìm thấy thông tin liên quan trong tài liệu.\",\"citations\":[]}]}\n5. NEVER include text outside the JSON structure\n6. NEVER use (Nguồn: ...) format - put citations in the citations array ONLY\n7. Start response with { and end with }\n8. The chunk_source_id is the source_id from the chunk metadata, chunk_lines_from and chunk_lines_to are the loc.lines.from and loc.lines.to from the chunk metadata"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        6256,
+        8592
+      ],
+      "id": "32b2f18a-d670-42a2-986e-aceb3cca0c49",
+      "name": "AI Agent1",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.body.session_id }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        6352,
+        8992
+      ],
+      "id": "69293e03-4718-400a-8191-967345a93203",
+      "name": "Postgres Chat Memory1",
+      "credentials": {
+        "postgres": {
+          "id": "uBpbv7i077Gtin3r",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolName": "retrieve_knowledge",
+        "toolDescription": "Retrieve releveant information",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "topK": 5,
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "notebook_id",
+                "value": "={{ $json.body.notebook_id }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.1,
+      "position": [
+        6608,
+        8912
+      ],
+      "id": "0ce59b29-7614-49bd-95f0-40e9104fcff5",
+      "name": "Supabase Vector Store1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "Z72m4xkuIEBqxMlM",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "[![The AI Automators](https://www.theaiautomators.com/wp-content/uploads/2025/03/gray-logo.png)](https://www.theaiautomators.com/)\n## InsightsLM\nhttps://github.com/theaiautomators/insights-lm-public",
+        "height": 220,
+        "width": 280,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        5968,
+        8272
+      ],
+      "id": "caead12c-c7cb-4b98-8d97-cae35e7aa4b3",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        5984,
+        9056
+      ],
+      "id": "443b307a-407d-4264-a34f-c7a2fed344fa",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "syHUxLmNIXSrPaSC",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        6592,
+        9120
+      ],
+      "id": "0faee1fb-ba40-4009-a483-66407e4f51d5",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "syHUxLmNIXSrPaSC",
+          "name": "OpenAi account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "cebbf92e-a45b-4e19-8f47-7c5d597e5602",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8aa65990611bf8c8eff44388d5865e91c835317eab848ea9b81a93b6e1a15d69"
+  },
+  "id": "lCAf2EJ6qvdgVz2t",
+  "tags": [
+    {
+      "updatedAt": "2026-03-18T17:37:57.362Z",
+      "createdAt": "2026-03-18T17:37:57.362Z",
+      "id": "JoQexUOz3iYBucBb",
+      "name": "TheAIAutomators.com"
+    }
+  ]
+}

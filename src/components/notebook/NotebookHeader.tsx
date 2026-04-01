@@ -2,7 +2,7 @@ import React, { useState, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { User, LogOut, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useNotebookUpdate } from '@/hooks/useNotebookUpdate';
 import {
   DropdownMenu,
@@ -42,12 +42,16 @@ const NotebookHeader = ({
   isMember = false,
 }: NotebookHeaderProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout } = useLogout();
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(title);
   const { updateNotebook, isUpdating } = useNotebookUpdate();
   const [isMemberPanelOpen, setIsMemberPanelOpen] = useState(false);
   
+  // Detect if user came from a search result (via location.state)
+  const fromSearch = (location.state as { fromSearch?: string })?.fromSearch;
+
   // Member count — uses TanStack Query dedup (same key as Notebook.tsx's useNotebookPermissions)
   const { data: members } = useNotebookMembers(notebookId);
   const memberCount = members?.length ?? 0;
@@ -82,6 +86,15 @@ const NotebookHeader = ({
     handleTitleSubmit();
   };
 
+  const handleBackClick = () => {
+    // [search state preservation] When navigating back from search result, preserve the search query
+    if (fromSearch) {
+      navigate(`/?q=${encodeURIComponent(fromSearch)}`);
+    } else {
+      navigate(-1);
+    }
+  };
+
   const handleIconClick = () => {
     navigate('/');
   };
@@ -91,13 +104,25 @@ const NotebookHeader = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            <button 
-              aria-label="Về trang trước"
-              onClick={() => navigate(-1)}
-              className="hover:bg-muted rounded transition-colors p-2 text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
+            {fromSearch ? (
+              /* Breadcrumb when coming from search — shows text for context */
+              <button
+                aria-label="Quay lại Dashboard"
+                onClick={handleBackClick}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-muted"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Quay lại Dashboard</span>
+              </button>
+            ) : (
+              <button 
+                aria-label="Về trang trước"
+                onClick={handleBackClick}
+                className="hover:bg-muted rounded transition-colors p-2 text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+            )}
             <button 
               aria-label="Về trang chủ"
               onClick={handleIconClick}

@@ -84,6 +84,7 @@ const AddSourcesDialog = ({
       const files = Array.from(e.dataTransfer.files);
       handleFileUpload(files);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,6 +92,7 @@ const AddSourcesDialog = ({
       const files = Array.from(e.target.files);
       handleFileUpload(files);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFileUpload = async (files: File[]) => {

@@ -5,7 +5,7 @@ import { FileText } from 'lucide-react';
 import { useNotes } from '@/hooks/useNotes';
 
 interface SaveToNoteButtonProps {
-  content: string | { segments: any[]; citations: any[] };
+  content: string | { segments: any[]; citations: any[] }; // eslint-disable-line @typescript-eslint/no-explicit-any
   notebookId?: string;
   onSaved?: () => void;
 }
@@ -41,7 +41,7 @@ const SaveToNoteButton = ({ content, notebookId, onSaved }: SaveToNoteButtonProp
       // Extract text for preview from first few segments
       extracted_text = content.segments
         .slice(0, 3)
-        .map((segment: any) => segment.text)
+        .map((segment: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => segment.text)
         .join(' ')
         .substring(0, 200);
     } else {

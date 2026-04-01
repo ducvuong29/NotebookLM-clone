@@ -1,48 +1,19 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getCorsHeaders, corsResponse } from '../_shared/cors.ts'
+import { authenticateRequest } from '../_shared/auth.ts'
 
 const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return corsResponse(req);
 
   try {
     // ============ AUTHORIZATION CHECK ============
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const { user, error: authError } = await authenticateRequest(req)
+    if (authError) return authError
 
-    // Verify user identity using their JWT
-    const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
-
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser()
-    if (userError || !user) {
-      console.error('Auth error:', userError)
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log('Authenticated user:', user.id)
     // ============ END AUTHORIZATION CHECK ============
 
     const { content } = await req.json();
@@ -52,7 +23,7 @@ serve(async (req) => {
         JSON.stringify({ error: 'Content is required' }), 
         { 
           status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } 
         }
       );
     }
@@ -65,7 +36,7 @@ serve(async (req) => {
         // Extract text from first few segments
         textContent = parsed.segments
           .slice(0, 3)
-          .map((segment: any) => segment.text)
+          .map((segment: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => segment.text)
           .join(' ');
       }
     } catch (e) {
@@ -106,12 +77,11 @@ serve(async (req) => {
     const data = await response.json();
     const generatedTitle = data.choices[0].message.content.trim();
 
-    console.log('Generated title:', generatedTitle);
 
     return new Response(
       JSON.stringify({ title: generatedTitle }), 
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
       }
     );
   } catch (error) {
@@ -120,7 +90,7 @@ serve(async (req) => {
       JSON.stringify({ error: error.message }), 
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
       }
     );
   }

@@ -73,7 +73,7 @@ export default function BulkImportDialog() {
           const rows: ParsedRow[] = [];
           const emailSet = new Set<string>();
 
-          results.data.forEach((row: any, i: number) => {
+          results.data.forEach((row: any /* eslint-disable-line @typescript-eslint/no-explicit-any */, i: number) => {
             const email = (row.email ?? '').toString().trim();
             const full_name = (row.full_name ?? '').toString().trim();
             
@@ -105,7 +105,7 @@ export default function BulkImportDialog() {
           setParsedRows(rows);
           setIsParsing(false);
         },
-        error: (error: any) => {
+        error: (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
           console.error('CSV Parse Error:', error);
           setIsParsing(false);
         }

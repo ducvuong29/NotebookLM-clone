@@ -76,10 +76,10 @@ BEGIN
   VALUES (v_notebook_id, v_owner_id, 'Chat Test NB', 'Private chat isolation test', 'private');
 
   -- Add members
-  INSERT INTO public.notebook_members (notebook_id, user_id, role, status, invited_by)
+  INSERT INTO public.notebook_members (notebook_id, user_id, role, invited_by)
   VALUES
-    (v_notebook_id, v_editor_id, 'editor', 'accepted', v_owner_id),
-    (v_notebook_id, v_viewer_id, 'viewer', 'accepted', v_owner_id);
+    (v_notebook_id, v_editor_id, 'editor', v_owner_id),
+    (v_notebook_id, v_viewer_id, 'viewer', v_owner_id);
 
   -- Insert chat history rows with COMPOSITE session_id format
   -- Owner's chat: {notebookId}:{ownerId}

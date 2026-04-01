@@ -1,45 +1,17 @@
-
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { getCorsHeaders, corsResponse } from '../_shared/cors.ts'
+import { authenticateRequest } from '../_shared/auth.ts'
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return corsResponse(req);
 
   try {
     // ============ AUTHORIZATION CHECK ============
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const { user, error: authError } = await authenticateRequest(req)
+    if (authError) return authError
 
-    // Verify user identity using their JWT
-    const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
-
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser()
-    if (userError || !user) {
-      console.error('Auth error:', userError)
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log('Authenticated user:', user.id)
     // ============ END AUTHORIZATION CHECK ============
 
     const { notebookId } = await req.json()
@@ -66,13 +38,23 @@ serve(async (req) => {
       throw new Error('Failed to fetch notebook')
     }
 
-    // Verify the user owns this notebook
+    // Verify the user has access to this notebook (owner, editor, or viewer)
     if (notebook.user_id !== user.id) {
-      console.error('User does not own this notebook:', { userId: user.id, ownerId: notebook.user_id })
-      return new Response(
-        JSON.stringify({ error: 'Forbidden - you do not own this notebook' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      // Not the owner — check notebook_members for any role
+      const { data: memberCheck } = await supabase
+        .from('notebook_members')
+        .select('role')
+        .eq('notebook_id', notebookId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!memberCheck) {
+        console.error('User does not have access:', { userId: user.id, ownerId: notebook.user_id })
+        return new Response(
+          JSON.stringify({ error: 'Forbidden - you do not have access to this notebook' }),
+          { status: 403, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     if (!notebook.audio_overview_url) {
@@ -91,7 +73,6 @@ serve(async (req) => {
     // Reconstruct the file path from the URL
     const filePath = urlParts.slice(bucketIndex + 1).join('/')
 
-    console.log('Refreshing signed URL for path:', filePath)
 
     // Generate a new signed URL with 24 hours expiration
     const { data: signedUrlData, error: signError } = await supabase.storage
@@ -121,7 +102,6 @@ serve(async (req) => {
       throw new Error('Failed to update notebook with new URL')
     }
 
-    console.log('Successfully refreshed audio URL for notebook:', notebookId)
 
     return new Response(
       JSON.stringify({ 
@@ -130,7 +110,7 @@ serve(async (req) => {
         expiresAt: newExpiryTime.toISOString()
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
       }
     )
 
@@ -142,7 +122,7 @@ serve(async (req) => {
       }),
       {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
       }
     )
   }

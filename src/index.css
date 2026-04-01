@@ -257,3 +257,51 @@
     opacity: 0.6;
   }
 }
+
+/* ===== Cross-Notebook Search Styles ===== */
+
+/* Search bar — glass-morphism focus glow */
+.search-bar {
+  transition: box-shadow var(--duration-normal) ease,
+              border-color var(--duration-normal) ease,
+              transform var(--duration-fast) ease;
+}
+.search-bar:focus-within {
+  box-shadow: 0 0 30px hsl(var(--primary) / 0.12);
+  border-color: hsl(var(--primary) / 0.35);
+  transform: translateY(-1px);
+}
+
+/* Search result card — content-visibility + staggered reveal */
+.search-result-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 200px;
+  animation: cardReveal 250ms var(--ease-out) both;
+}
+
+@keyframes cardReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Content snippet — FTS highlight marks */
+.content-snippet mark {
+  background: linear-gradient(135deg, hsl(45 100% 60% / 0.35), hsl(40 100% 50% / 0.25));
+  color: inherit;
+  border-radius: 2px;
+  padding: 0.05em 0.2em;
+  font-weight: 600;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* Dark mode highlight */
+.dark .content-snippet mark {
+  background: linear-gradient(135deg, hsl(45 100% 50% / 0.3), hsl(35 100% 45% / 0.2));
+}

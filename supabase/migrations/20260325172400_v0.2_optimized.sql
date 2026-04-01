@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 -- Notebooks table (with CHECK constraints — Fix #5)
 CREATE TABLE IF NOT EXISTS public.notebooks (
-    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     title text NOT NULL,
     description text,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS public.notebooks (
 
 -- Sources table (with CHECK constraint — Fix #5)
 CREATE TABLE IF NOT EXISTS public.sources (
-    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     notebook_id uuid NOT NULL REFERENCES public.notebooks(id) ON DELETE CASCADE,
     title text NOT NULL,
     type source_type NOT NULL,
@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS public.sources (
 
 -- Notes table
 CREATE TABLE IF NOT EXISTS public.notes (
-    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     notebook_id uuid NOT NULL REFERENCES public.notebooks(id) ON DELETE CASCADE,
     title text NOT NULL,
     content text NOT NULL,

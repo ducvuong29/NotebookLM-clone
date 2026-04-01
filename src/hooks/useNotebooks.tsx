@@ -23,14 +23,15 @@ export const useNotebooks = () => {
       
       console.log('Fetching notebooks for user:', user.id);
       
-      // First get the notebooks
+      // PERF-001: Single query with embedded source count (eliminates N+1 pattern)
+      // PostgREST uses FK sources.notebook_id → notebooks.id for LEFT JOIN + GROUP BY
+      // Returns: { ...notebook, sources: [{ count: N }] } — same shape as before
       // RLS handles visibility scoping:
       // - Owner sees own notebooks (user_id = auth.uid())
       // - All authenticated users see public notebooks (visibility = 'public')
-      // - Admins see everything (admin bypass)
-      const { data: notebooksData, error: notebooksError } = await supabase
+      const { data, error: notebooksError } = await supabase
         .from('notebooks')
-        .select('*')
+        .select('*, sources(count)')
         .order('updated_at', { ascending: false });
 
       if (notebooksError) {
@@ -38,25 +39,8 @@ export const useNotebooks = () => {
         throw notebooksError;
       }
 
-      // Then get source counts separately for each notebook
-      const notebooksWithCounts = await Promise.all(
-        (notebooksData || []).map(async (notebook) => {
-          const { count, error: countError } = await supabase
-            .from('sources')
-            .select('*', { count: 'exact', head: true })
-            .eq('notebook_id', notebook.id);
-
-          if (countError) {
-            console.error('Error fetching source count for notebook:', notebook.id, countError);
-            return { ...notebook, sources: [{ count: 0 }] };
-          }
-
-          return { ...notebook, sources: [{ count: count || 0 }] };
-        })
-      );
-
-      console.log('Fetched notebooks:', notebooksWithCounts?.length || 0);
-      return notebooksWithCounts || [];
+      console.log('Fetched notebooks:', data?.length || 0);
+      return data || [];
     },
     enabled: isAuthenticated && !authLoading,
     retry: (failureCount, error) => {
@@ -66,6 +50,19 @@ export const useNotebooks = () => {
       }
       return failureCount < 3;
     },
+  });
+
+  const { data: myMemberships } = useQuery({
+    queryKey: ['my-memberships', user?.id],
+    queryFn: async () => {
+      if (!user) return new Set<string>();
+      const { data } = await supabase
+        .from('notebook_members')
+        .select('notebook_id')
+        .eq('user_id', user.id);
+      return new Set(data?.map(m => m.notebook_id) ?? []);
+    },
+    enabled: !!user?.id,
   });
 
   // Set up real-time subscription for notebooks updates
@@ -138,6 +135,7 @@ export const useNotebooks = () => {
 
   return {
     notebooks,
+    myMemberships,
     isLoading: authLoading || isLoading,
     error: error?.message || null,
     isError,

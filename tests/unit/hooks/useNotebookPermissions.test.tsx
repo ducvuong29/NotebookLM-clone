@@ -18,10 +18,10 @@ describe('useNotebookPermissions', () => {
   });
 
   it('grants owner permissions if user is the notebook creator', () => {
-    (useAuth as any).mockReturnValue({
+    (useAuth as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).mockReturnValue({
       user: { id: 'user-1', user_metadata: { role: 'user' } }
     });
-    (useNotebookMembers as any).mockReturnValue({
+    (useNotebookMembers as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).mockReturnValue({
       data: [],
       isLoading: false
     });
@@ -37,10 +37,10 @@ describe('useNotebookPermissions', () => {
   });
 
   it('grants admin permissions if user is a system admin', () => {
-    (useAuth as any).mockReturnValue({
+    (useAuth as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).mockReturnValue({
       user: { id: 'admin-1', user_metadata: { role: 'admin' } }
     });
-    (useNotebookMembers as any).mockReturnValue({
+    (useNotebookMembers as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).mockReturnValue({
       data: [],
       isLoading: false
     });
@@ -55,10 +55,10 @@ describe('useNotebookPermissions', () => {
   });
 
   it('grants editor permissions if user is an accepted member with editor role', () => {
-    (useAuth as any).mockReturnValue({
+    (useAuth as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).mockReturnValue({
       user: { id: 'user-2' }
     });
-    (useNotebookMembers as any).mockReturnValue({
+    (useNotebookMembers as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).mockReturnValue({
       data: [
         { user_id: 'user-2', status: 'accepted', role: 'editor' }
       ],
@@ -76,10 +76,10 @@ describe('useNotebookPermissions', () => {
   });
 
   it('grants viewer permissions if user is an accepted member with viewer role', () => {
-    (useAuth as any).mockReturnValue({
+    (useAuth as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).mockReturnValue({
       user: { id: 'user-3' }
     });
-    (useNotebookMembers as any).mockReturnValue({
+    (useNotebookMembers as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).mockReturnValue({
       data: [
         { user_id: 'user-3', status: 'accepted', role: 'viewer' }
       ],
@@ -97,11 +97,11 @@ describe('useNotebookPermissions', () => {
   });
 
   it('returns null role and no permissions for uninvited/non-member users', () => {
-    (useAuth as any).mockReturnValue({
+    (useAuth as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).mockReturnValue({
       user: { id: 'user-4' }
     });
     // Pending member or not in member list
-    (useNotebookMembers as any).mockReturnValue({
+    (useNotebookMembers as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).mockReturnValue({
       data: [
         { user_id: 'user-4', status: 'pending', role: 'viewer' }
       ],

@@ -102,6 +102,7 @@ const Notebook = () => {
               onCitationClick={handleCitationClick}
               canEdit={canEdit}
               canDelete={canDelete}
+              isMember={isMember}
             />
           </div>
         </main>
@@ -121,6 +122,7 @@ const Notebook = () => {
             setActiveTab={setActiveTab}
             canEdit={canEdit}
             canDelete={canDelete}
+            isMember={isMember}
           />
           </ErrorBoundary>
         </main>

@@ -2,7 +2,7 @@ import { useNotebookMembers } from '@/hooks/useCollaborationApi';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface NotebookPermissions {
-  role: 'admin' | 'owner' | 'editor' | 'viewer' | null;
+  role: 'owner' | 'editor' | 'viewer' | null;
   canEdit: boolean;
   canDelete: boolean;
   canInvite: boolean;
@@ -17,19 +17,18 @@ export function useNotebookPermissions(notebookId: string | undefined, notebookO
   const { user } = useAuth();
   const { data: members, isLoading } = useNotebookMembers(notebookId);
 
-  const isAdmin = user?.user_metadata?.role === 'admin';
   const isNotebookOwner = notebookOwnerId === user?.id;
-  const memberRecord = members?.find(m => m.user_id === user?.id && m.status === 'accepted');
+  const memberRecord = members?.find(m => m.user_id === user?.id);
   const memberRole = memberRecord?.role as 'editor' | 'viewer' | undefined;
 
-  const role = isAdmin ? 'admin' : isNotebookOwner ? 'owner' : memberRole ?? null;
+  const role = isNotebookOwner ? 'owner' : memberRole ?? null;
   
-  const canEdit = role === 'owner' || role === 'editor' || role === 'admin';
-  const canDelete = role === 'owner' || role === 'admin';
-  const canInvite = role === 'owner' || role === 'admin';
+  const canEdit = role === 'owner' || role === 'editor';
+  const canDelete = role === 'owner' || role === 'editor'; // Allow editors to delete sources and notes
+  const canInvite = role === 'owner';
   const canChat = role !== null;
   const canView = role !== null;
-  const isOwner = role === 'owner' || (isNotebookOwner && role !== 'admin');
+  const isOwner = role === 'owner';
   const isMember = role !== null;
 
   return {

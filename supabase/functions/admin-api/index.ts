@@ -1,13 +1,6 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-// ============================================================================
-// CORS Headers — shared across all responses
-// ============================================================================
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders, corsResponse } from '../_shared/cors.ts'
 
 // ============================================================================
 // Response Helpers — Unified API response format
@@ -23,19 +16,19 @@ interface SuccessResponseBody<T = unknown> {
   data: T
 }
 
-function errorResponse(status: number, code: string, message: string): Response {
+function errorResponse(req: Request, status: number, code: string, message: string): Response {
   const body: ErrorResponseBody = { error: true, code, message }
   return new Response(
     JSON.stringify(body),
-    { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    { status, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
   )
 }
 
-function successResponse<T>(data: T): Response {
+function successResponse<T>(req: Request, data: T): Response {
   const body: SuccessResponseBody<T> = { data }
   return new Response(
     JSON.stringify(body),
-    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    { status: 200, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
   )
 }
 
@@ -48,8 +41,8 @@ interface PingResponse {
   role: string
 }
 
-function handlePing(): Response {
-  return successResponse<PingResponse>({ status: 'ok', role: 'admin' })
+function handlePing(req: Request): Response {
+  return successResponse<PingResponse>(req, { status: 'ok', role: 'admin' })
 }
 
 interface CreateUserRequest {
@@ -64,19 +57,20 @@ interface CreateUserResponseData {
 }
 
 async function handleCreateUser(
+  req: Request,
   body: { email?: string; full_name?: string },
   supabaseAdmin: ReturnType<typeof createClient>
 ): Promise<Response> {
   const { email, full_name } = body as CreateUserRequest
 
   if (!email || !full_name) {
-    return errorResponse(400, 'INVALID_INPUT', 'Vui lòng nhập đầy đủ thông tin')
+    return errorResponse(req, 400, 'INVALID_INPUT', 'Vui lòng nhập đầy đủ thông tin')
   }
 
   // Basic email format check (server-side defense-in-depth)
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(email)) {
-    return errorResponse(400, 'INVALID_EMAIL', 'Email không hợp lệ')
+    return errorResponse(req, 400, 'INVALID_EMAIL', 'Email không hợp lệ')
   }
 
   // Create auth user — Supabase sends invite email automatically
@@ -88,10 +82,10 @@ async function handleCreateUser(
 
   if (authError) {
     if (authError.message?.includes('already been registered') || authError.message?.includes('already exists')) {
-      return errorResponse(409, 'USER_EXISTS', 'Email đã tồn tại trong hệ thống')
+      return errorResponse(req, 409, 'USER_EXISTS', 'Email đã tồn tại trong hệ thống')
     }
     console.error('[admin-api] createUser error:', authError)
-    return errorResponse(500, 'INTERNAL_ERROR', 'Không thể tạo tài khoản')
+    return errorResponse(req, 500, 'INTERNAL_ERROR', 'Không thể tạo tài khoản')
   }
 
   // Update profile with full_name (handle_new_user trigger auto-creates profile row)
@@ -106,9 +100,8 @@ async function handleCreateUser(
     }
   }
 
-  console.log('[admin-api] User created successfully:', { email, userId: authData.user?.id })
 
-  return successResponse<CreateUserResponseData>({
+  return successResponse<CreateUserResponseData>(req, {
     user_id: authData.user?.id ?? '',
     email,
     full_name,
@@ -135,112 +128,146 @@ interface ListUsersResponseData {
 }
 
 async function handleListUsers(
+  req: Request,
   body: { page?: number; perPage?: number; search?: string },
-  supabaseAdmin: ReturnType<typeof createClient>
+  supabaseAuth: ReturnType<typeof createClient>
 ): Promise<Response> {
   const page = body.page ?? 1
   const perPage = Math.min(body.perPage ?? 25, 100)
   const search = body.search?.trim() ?? ''
 
-  // Fetch auth users — includes banned_until, last_sign_in_at
-  const { data: authResult, error: authError } = await supabaseAdmin.auth.admin.listUsers({
-    page,
-    perPage,
+  // PERF-002: Single RPC call replaces 2-query merge + client-side filter
+  // Uses supabaseAuth (JWT client) so RPC's SECURITY DEFINER admin check works
+  // (auth.uid() resolves to the admin user → role check passes)
+  // Fixes: search across ALL users (not just current page), accurate total count
+  const { data, error: rpcError } = await supabaseAuth.rpc('get_admin_users', {
+    page_num: page,
+    page_size: perPage,
+    search_query: search,
   })
 
-  if (authError) {
-    console.error('[admin-api] listUsers error:', authError)
-    return errorResponse(500, 'INTERNAL_ERROR', 'Không thể tải danh sách')
+  if (rpcError) {
+    console.error('[admin-api] get_admin_users RPC error:', rpcError)
+    return errorResponse(req, 500, 'INTERNAL_ERROR', 'Không thể tải danh sách')
   }
 
-  // Fetch profiles for full_name, role
-  const userIds = authResult.users.map((u: { id: string }) => u.id)
-  const { data: profiles } = await supabaseAdmin
-    .from('profiles')
-    .select('id, full_name, role')
-    .in('id', userIds)
-
-  const profileMap = new Map<string, { full_name: string | null; role: string }>(
-    (profiles ?? []).map((p: { id: string; full_name: string | null; role: string }) => [p.id, p])
+  // Window function count(*) OVER() returns total in every row
+  const total = data?.[0]?.total_count ?? 0
+  const users: ListUsersResponseItem[] = (data ?? []).map(
+    (u: {
+      id: string
+      email: string
+      full_name: string | null
+      role: string
+      created_at: string
+      last_sign_in_at: string | null
+      is_disabled: boolean
+    }) => ({
+      id: u.id,
+      email: u.email,
+      full_name: u.full_name,
+      role: u.role ?? 'user',
+      created_at: u.created_at,
+      last_sign_in_at: u.last_sign_in_at,
+      is_disabled: u.is_disabled,
+    })
   )
 
-  // Merge auth + profile data
-  let mergedUsers: ListUsersResponseItem[] = authResult.users.map(
-    (authUser: {
-      id: string
-      email?: string
-      created_at: string
-      last_sign_in_at?: string
-      banned_until?: string
-      user_metadata?: { full_name?: string }
-    }) => {
-      const profile = profileMap.get(authUser.id)
-      return {
-        id: authUser.id,
-        email: authUser.email ?? '',
-        full_name: profile?.full_name ?? authUser.user_metadata?.full_name ?? null,
-        role: profile?.role ?? 'user',
-        created_at: authUser.created_at,
-        last_sign_in_at: authUser.last_sign_in_at ?? null,
-        is_disabled: !!authUser.banned_until,
+
+  return successResponse<ListUsersResponseData>(req, {
+    users,
+    total: Number(total),
+  })
+}
+
+// ============================================================================
+// delete_user — Permanently delete user and all associated data
+// ============================================================================
+
+interface DeleteUserResponseData {
+  user_id: string
+  deleted: boolean
+}
+
+async function handleDeleteUser(
+  req: Request,
+  body: { user_id?: string },
+  supabaseAdmin: ReturnType<typeof createClient>,
+  currentAdminId: string
+): Promise<Response> {
+  const { user_id } = body
+
+  if (!user_id) {
+    return errorResponse(req, 400, 'INVALID_INPUT', 'Thiếu thông tin người dùng')
+  }
+
+  // Self-deletion guard — admin cannot delete themselves
+  if (user_id === currentAdminId) {
+    return errorResponse(req, 403, 'FORBIDDEN', 'Không thể xóa tài khoản của chính mình')
+  }
+
+  // Check if user exists and what role they have
+  const { data: targetProfile, error: profileFetchError } = await supabaseAdmin
+    .from('profiles')
+    .select('id, role, full_name, email')
+    .eq('id', user_id)
+    .single()
+
+  if (profileFetchError || !targetProfile) {
+    return errorResponse(req, 404, 'USER_NOT_FOUND', 'Không tìm thấy người dùng')
+  }
+
+  // Block deletion of admin accounts
+  if (targetProfile.role === 'admin') {
+    return errorResponse(req, 403, 'FORBIDDEN', 'Không thể xóa tài khoản admin')
+  }
+
+  // Clean up storage files for all notebooks owned by this user
+  const { data: userNotebooks } = await supabaseAdmin
+    .from('notebooks')
+    .select('id')
+    .eq('user_id', user_id)
+
+  if (userNotebooks && userNotebooks.length > 0) {
+    for (const notebook of userNotebooks) {
+      // Delete source files from storage
+      const { data: sources } = await supabaseAdmin
+        .from('sources')
+        .select('file_path')
+        .eq('notebook_id', notebook.id)
+
+      const filesToDelete = sources
+        ?.filter((s: { file_path: string | null }) => s.file_path)
+        .map((s: { file_path: string | null }) => s.file_path) || []
+
+      if (filesToDelete.length > 0) {
+        await supabaseAdmin.storage.from('sources').remove(filesToDelete)
+      }
+
+      // Delete audio files from storage
+      const { data: audioFiles } = await supabaseAdmin.storage
+        .from('audio')
+        .list(notebook.id)
+
+      if (audioFiles && audioFiles.length > 0) {
+        const audioPaths = audioFiles.map((f: { name: string }) => `${notebook.id}/${f.name}`)
+        await supabaseAdmin.storage.from('audio').remove(audioPaths)
       }
     }
-  )
-
-  // Server-side search filter (auth.admin.listUsers doesn't support search)
-  if (search) {
-    const lower = search.toLowerCase()
-    mergedUsers = mergedUsers.filter(
-      (u) =>
-        u.email.toLowerCase().includes(lower) ||
-        (u.full_name?.toLowerCase().includes(lower) ?? false)
-    )
   }
 
-  console.log('[admin-api] listUsers:', { page, perPage, search, count: mergedUsers.length })
+  // Delete auth user — cascades to profiles → notebooks → sources/notes/documents
+  const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user_id)
 
-  return successResponse<ListUsersResponseData>({
-    users: mergedUsers,
-    total: mergedUsers.length,
-  })
-}
-
-// ============================================================================
-// toggle_user_status — Ban/unban user via Auth Admin API
-// ============================================================================
-
-interface ToggleUserStatusResponseData {
-  user_id: string
-  enabled: boolean
-}
-
-async function handleToggleUserStatus(
-  body: { user_id?: string; enabled?: boolean },
-  supabaseAdmin: ReturnType<typeof createClient>
-): Promise<Response> {
-  const { user_id, enabled } = body
-
-  if (!user_id || typeof enabled !== 'boolean') {
-    return errorResponse(400, 'INVALID_INPUT', 'Thiếu thông tin người dùng')
-  }
-
-  // ban_duration: 'none' to unban, '876000h' (~100 years) to effectively ban
-  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-    user_id,
-    { ban_duration: enabled ? 'none' : '876000h' }
-  )
-
-  if (updateError) {
-    if (updateError.message?.includes('not found')) {
-      return errorResponse(404, 'USER_NOT_FOUND', 'Không tìm thấy người dùng')
+  if (deleteError) {
+    if (deleteError.message?.includes('not found')) {
+      return errorResponse(req, 404, 'USER_NOT_FOUND', 'Không tìm thấy người dùng')
     }
-    console.error('[admin-api] toggleUserStatus error:', updateError)
-    return errorResponse(500, 'INTERNAL_ERROR', 'Không thể cập nhật trạng thái')
+    console.error('[admin-api] deleteUser error:', deleteError)
+    return errorResponse(req, 500, 'INTERNAL_ERROR', 'Không thể xóa tài khoản')
   }
 
-  console.log('[admin-api] User status toggled:', { user_id, enabled })
-
-  return successResponse<ToggleUserStatusResponseData>({ user_id, enabled })
+  return successResponse<DeleteUserResponseData>(req, { user_id, deleted: true })
 }
 
 // ============================================================================
@@ -259,17 +286,18 @@ interface BulkCreateUserResponseData {
 }
 
 async function handleBulkCreateUsers(
+  req: Request,
   body: BulkCreateUserRequest,
   supabaseAdmin: ReturnType<typeof createClient>
 ): Promise<Response> {
   const { users } = body;
 
   if (!Array.isArray(users) || users.length === 0) {
-    return errorResponse(400, 'INVALID_INPUT', 'Vui lòng cung cấp danh sách người dùng cần tạo');
+    return errorResponse(req, 400, 'INVALID_INPUT', 'Vui lòng cung cấp danh sách người dùng cần tạo');
   }
 
   if (users.length > 100) {
-    return errorResponse(400, 'PAYLOAD_TOO_LARGE', 'Chỉ hỗ trợ tối đa 100 người dùng mỗi lượt');
+    return errorResponse(req, 400, 'PAYLOAD_TOO_LARGE', 'Chỉ hỗ trợ tối đa 100 người dùng mỗi lượt');
   }
 
   const failed: Array<{ email: string; reason: string }> = [];
@@ -317,9 +345,8 @@ async function handleBulkCreateUsers(
     success_count++;
   }
 
-  console.log('[admin-api] Bulk Users created:', { success: success_count, failed: failed.length });
 
-  return successResponse<BulkCreateUserResponseData>({
+  return successResponse<BulkCreateUserResponseData>(req, {
     success_count,
     failed_count: failed.length,
     total: users.length,
@@ -336,6 +363,7 @@ interface CreatePublicNotebookResponseData {
 }
 
 async function handleCreatePublicNotebook(
+  req: Request,
   body: { title?: string; visibility?: string },
   supabaseAdmin: ReturnType<typeof createClient>,
   userId: string
@@ -344,11 +372,11 @@ async function handleCreatePublicNotebook(
   const visibility = body.visibility ?? 'public'
 
   if (!title || title.trim() === '') {
-    return errorResponse(400, 'INVALID_INPUT', 'Vui lòng nhập tên notebook')
+    return errorResponse(req, 400, 'INVALID_INPUT', 'Vui lòng nhập tên notebook')
   }
 
   if (!['public', 'private'].includes(visibility)) {
-    return errorResponse(400, 'INVALID_INPUT', 'Chế độ hiển thị không hợp lệ (public hoặc private)')
+    return errorResponse(req, 400, 'INVALID_INPUT', 'Chế độ hiển thị không hợp lệ (public hoặc private)')
   }
 
   const { data, error } = await supabaseAdmin
@@ -363,12 +391,11 @@ async function handleCreatePublicNotebook(
 
   if (error) {
     console.error('[admin-api] createPublicNotebook error:', error)
-    return errorResponse(500, 'INTERNAL_ERROR', 'Không thể tạo public notebook')
+    return errorResponse(req, 500, 'INTERNAL_ERROR', 'Không thể tạo public notebook')
   }
 
-  console.log('[admin-api] Public notebook created:', { notebook_id: data.id, visibility, user_id: userId })
 
-  return successResponse<CreatePublicNotebookResponseData>({
+  return successResponse<CreatePublicNotebookResponseData>(req, {
     notebook_id: data.id
   })
 }
@@ -382,13 +409,14 @@ interface DeletePublicNotebookResponseData {
 }
 
 async function handleDeletePublicNotebook(
+  req: Request,
   body: { notebook_id?: string },
   supabaseAdmin: ReturnType<typeof createClient>
 ): Promise<Response> {
   const { notebook_id } = body
 
   if (!notebook_id) {
-    return errorResponse(400, 'INVALID_INPUT', 'Vui lòng cung cấp ID của notebook')
+    return errorResponse(req, 400, 'INVALID_INPUT', 'Vui lòng cung cấp ID của notebook')
   }
 
   // 1. Verify notebook exists and is public
@@ -399,11 +427,11 @@ async function handleDeletePublicNotebook(
     .single()
 
   if (fetchError || !notebook) {
-    return errorResponse(404, 'NOT_FOUND', 'Không tìm thấy notebook')
+    return errorResponse(req, 404, 'NOT_FOUND', 'Không tìm thấy notebook')
   }
 
   if (notebook.visibility !== 'public') {
-    return errorResponse(403, 'FORBIDDEN', 'Chỉ có thể xoá public notebook qua API này')
+    return errorResponse(req, 403, 'FORBIDDEN', 'Chỉ có thể xoá public notebook qua API này')
   }
 
   // 2. Fetch sources to delete files from storage
@@ -436,12 +464,11 @@ async function handleDeletePublicNotebook(
 
   if (deleteError) {
     console.error('[admin-api] Error deleting notebook:', deleteError)
-    return errorResponse(500, 'INTERNAL_ERROR', 'Không xoá được notebook')
+    return errorResponse(req, 500, 'INTERNAL_ERROR', 'Không xoá được notebook')
   }
 
-  console.log('[admin-api] Public notebook deleted:', { notebook_id })
 
-  return successResponse<DeletePublicNotebookResponseData>({
+  return successResponse<DeletePublicNotebookResponseData>(req, {
     success: true
   })
 }
@@ -456,29 +483,36 @@ interface ToggleVisibilityResponseData {
 }
 
 async function handleToggleVisibility(
+  req: Request,
   body: { notebook_id?: string; visibility?: string },
-  supabaseAdmin: ReturnType<typeof createClient>
+  supabaseAdmin: ReturnType<typeof createClient>,
+  adminUserId: string
 ): Promise<Response> {
   const { notebook_id, visibility } = body
 
   if (!notebook_id || !visibility || !['public', 'private'].includes(visibility)) {
-    return errorResponse(400, 'INVALID_INPUT', 'Thiếu thông tin hoặc giá trị không hợp lệ')
+    return errorResponse(req, 400, 'INVALID_INPUT', 'Thiếu thông tin hoặc giá trị không hợp lệ')
   }
 
-  // Verify notebook exists before updating
+  // Verify notebook exists AND admin is the owner
   const { data: notebook, error: fetchError } = await supabaseAdmin
     .from('notebooks')
-    .select('id, visibility')
+    .select('id, visibility, user_id')
     .eq('id', notebook_id)
     .single()
 
   if (fetchError || !notebook) {
-    return errorResponse(404, 'NOT_FOUND', 'Không tìm thấy notebook')
+    return errorResponse(req, 404, 'NOT_FOUND', 'Không tìm thấy notebook')
+  }
+
+  // Ownership check — admin can only toggle visibility on notebooks they own
+  if (notebook.user_id !== adminUserId) {
+    return errorResponse(req, 403, 'FORBIDDEN', 'Bạn chỉ có thể thay đổi chế độ hiển thị notebook do mình tạo')
   }
 
   if (notebook.visibility === visibility) {
     // Already in desired state, return success idempotently
-    return successResponse<ToggleVisibilityResponseData>({
+    return successResponse<ToggleVisibilityResponseData>(req, {
       notebook_id,
       visibility
     })
@@ -491,12 +525,11 @@ async function handleToggleVisibility(
 
   if (updateError) {
     console.error('[admin-api] toggleVisibility error:', updateError)
-    return errorResponse(500, 'INTERNAL_ERROR', 'Không thể cập nhật chế độ hiển thị')
+    return errorResponse(req, 500, 'INTERNAL_ERROR', 'Không thể cập nhật chế độ hiển thị')
   }
 
-  console.log('[admin-api] Notebook visibility updated:', { notebook_id, visibility })
 
-  return successResponse<ToggleVisibilityResponseData>({
+  return successResponse<ToggleVisibilityResponseData>(req, {
     notebook_id,
     visibility
   })
@@ -508,15 +541,13 @@ async function handleToggleVisibility(
 
 serve(async (req: Request) => {
   // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return corsResponse(req);
 
   try {
     // ============ 1. AUTHORIZATION CHECK ============
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return errorResponse(401, 'UNAUTHORIZED', 'Vui lòng đăng nhập')
+      return errorResponse(req, 401, 'UNAUTHORIZED', 'Vui lòng đăng nhập')
     }
 
     // Verify user identity using their JWT
@@ -529,10 +560,9 @@ serve(async (req: Request) => {
     const { data: { user }, error: userError } = await supabaseAuth.auth.getUser()
     if (userError || !user) {
       console.error('[admin-api] Auth error:', userError)
-      return errorResponse(401, 'UNAUTHORIZED', 'Phiên đăng nhập đã hết hạn')
+      return errorResponse(req, 401, 'UNAUTHORIZED', 'Phiên đăng nhập đã hết hạn')
     }
 
-    console.log('[admin-api] Authenticated user:', user.id)
 
     // ============ 2. ADMIN GUARD ============
     const supabaseAdmin = createClient(
@@ -548,56 +578,55 @@ serve(async (req: Request) => {
 
     if (profileError || !profile) {
       console.error('[admin-api] Profile lookup error:', profileError)
-      return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền truy cập')
+      return errorResponse(req, 403, 'FORBIDDEN', 'Bạn không có quyền truy cập')
     }
 
     if (profile.role !== 'admin') {
       console.warn('[admin-api] Non-admin access attempt:', { userId: user.id, role: profile.role })
-      return errorResponse(403, 'FORBIDDEN', 'Bạn không có quyền truy cập')
+      return errorResponse(req, 403, 'FORBIDDEN', 'Bạn không có quyền truy cập')
     }
 
-    console.log('[admin-api] Admin access granted:', user.id)
 
     // ============ 3. PARSE ACTION ============
     const body = await req.json()
     const { action } = body as { action: string }
 
     if (!action) {
-      return errorResponse(400, 'INVALID_ACTION', 'Hành động không hợp lệ')
+      return errorResponse(req, 400, 'INVALID_ACTION', 'Hành động không hợp lệ')
     }
 
     // ============ 4. ACTION DISPATCH ============
     switch (action) {
       case 'ping':
-        return handlePing()
+        return handlePing(req)
 
       case 'create_user':
-        return await handleCreateUser(body, supabaseAdmin)
+        return await handleCreateUser(req, body, supabaseAdmin)
 
       case 'list_users':
-        return await handleListUsers(body, supabaseAdmin)
+        return await handleListUsers(req, body, supabaseAuth)
 
-      case 'toggle_user_status':
-        return await handleToggleUserStatus(body, supabaseAdmin)
+      case 'delete_user':
+        return await handleDeleteUser(req, body, supabaseAdmin, user.id)
 
       case 'bulk_create_users':
-        return await handleBulkCreateUsers(body as unknown as BulkCreateUserRequest, supabaseAdmin)
+        return await handleBulkCreateUsers(req, body as unknown as BulkCreateUserRequest, supabaseAdmin)
 
       case 'create_public_notebook':
-        return await handleCreatePublicNotebook(body, supabaseAdmin, user.id)
+        return await handleCreatePublicNotebook(req, body, supabaseAdmin, user.id)
 
       case 'delete_public_notebook':
-        return await handleDeletePublicNotebook(body, supabaseAdmin)
+        return await handleDeletePublicNotebook(req, body, supabaseAdmin)
 
       case 'toggle_visibility':
-        return await handleToggleVisibility(body, supabaseAdmin)
+        return await handleToggleVisibility(req, body, supabaseAdmin, user.id)
 
       default:
-        return errorResponse(400, 'INVALID_ACTION', 'Hành động không hợp lệ')
+        return errorResponse(req, 400, 'INVALID_ACTION', 'Hành động không hợp lệ')
     }
 
   } catch (error) {
     console.error('[admin-api] Unhandled error:', error)
-    return errorResponse(500, 'INTERNAL_ERROR', 'Đã xảy ra lỗi hệ thống')
+    return errorResponse(req, 500, 'INTERNAL_ERROR', 'Đã xảy ra lỗi hệ thống')
   }
 })

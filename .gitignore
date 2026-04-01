@@ -34,28 +34,43 @@ n8n_db.sqlite*
 .env
 .roo/
 
-# Temporary and Output Files
 # AI Agent and Local Output Directories
-
+.agent/
+.agents/
+.claude/
+.serena/
+_bmad/
+_bmad-output/
+AGENTS.md
+CLAUDE.md
+design-artifacts/
+plans/
+docs/
 
 # Temporary and Output Files
 admin-api-origin.ts
 admin-diff*.txt
 *_log.txt
 lint*.txt
+test*.txt
+temp_diff*.txt
+log*.txt
+utf8*.txt
+status.txt
+clean_log.txt
+push_error.txt
 *.sqlite
 *.sqlite-journal
 .gitnexus
-
-# AI Agent Output and Local Configs
-.agent/
-.agents/
-.claude/
-.serena/
-AGENTS.md
-CLAUDE.md
-_bmad-output/
-_bmad/
-skills-lock.json
-temp_*.txt
-supabase/.branches/
+*.txt
+*.log
+db_dump.sql
+notebook-page-error.png
+perf.json
+rpt.json
+tmp_report.json
+tmp/
+playwright-report/
+test-results/
+fix_lint.cjs
+tmp-parser.cjs

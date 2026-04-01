@@ -20,7 +20,7 @@ export const useLogout = () => {
       // Redirect to auth page
       navigate('/auth', { replace: true });
       
-    } catch (error: any) {
+    } catch (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       console.error('Logout error:', error);
       
       // Even if there's an error, redirect to auth page

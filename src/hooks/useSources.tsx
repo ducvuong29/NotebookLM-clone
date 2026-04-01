@@ -35,10 +35,10 @@ export const useSources = (notebookId?: string) => {
   useEffect(() => {
     if (!notebookId || !user) return;
 
-    console.log('Setting up Realtime subscription for sources table, notebook:', notebookId);
-
+    // [perf] Channel name is unique per notebook — prevents race conditions when
+    // multiple tabs or notebooks are open simultaneously sharing the same channel.
     const channel = supabase
-      .channel('sources-changes')
+      .channel(`sources-changes-${notebookId}`)
       .on(
         'postgres_changes',
         {
@@ -47,53 +47,39 @@ export const useSources = (notebookId?: string) => {
           table: 'sources',
           filter: `notebook_id=eq.${notebookId}`
         },
-        (payload: any) => {
-          console.log('Realtime: Sources change received:', payload);
-          
+        (payload: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
           // Update the query cache based on the event type
-          queryClient.setQueryData(['sources', notebookId], (oldSources: any[] = []) => {
+          queryClient.setQueryData(['sources', notebookId], (oldSources: any /* eslint-disable-line @typescript-eslint/no-explicit-any */[] = []) => {
             switch (payload.eventType) {
               case 'INSERT': {
-                // Add new source if it doesn't already exist
-                const newSource = payload.new as any;
+                const newSource = payload.new as any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
                 const existsInsert = oldSources.some(source => source.id === newSource?.id);
-                if (existsInsert) {
-                  console.log('Source already exists, skipping INSERT:', newSource?.id);
-                  return oldSources;
-                }
-                console.log('Adding new source to cache:', newSource);
+                // Deduplicate: Realtime may fire after optimistic insert from addSource.onSuccess
+                if (existsInsert) return oldSources;
                 return [newSource, ...oldSources];
               }
-                
+
               case 'UPDATE': {
-                // Update existing source
-                const updatedSource = payload.new as any;
-                console.log('Updating source in cache:', updatedSource?.id);
-                return oldSources.map(source => 
+                const updatedSource = payload.new as any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
+                return oldSources.map(source =>
                   source.id === updatedSource?.id ? updatedSource : source
                 );
               }
-                
+
               case 'DELETE': {
-                // Remove deleted source
-                const deletedSource = payload.old as any;
-                console.log('Removing source from cache:', deletedSource?.id);
+                const deletedSource = payload.old as any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
                 return oldSources.filter(source => source.id !== deletedSource?.id);
               }
-                
+
               default:
-                console.log('Unknown event type:', payload.eventType);
                 return oldSources;
             }
           });
         }
       )
-      .subscribe((status) => {
-        console.log('Realtime subscription status for sources:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('Cleaning up Realtime subscription for sources');
       supabase.removeChannel(channel);
     };
   }, [notebookId, user, queryClient]);
@@ -108,7 +94,7 @@ export const useSources = (notebookId?: string) => {
       file_path?: string;
       file_size?: number;
       processing_status?: string;
-      metadata?: any;
+      metadata?: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
     }) => {
       if (!user) throw new Error('User not authenticated');
 
@@ -134,10 +120,18 @@ export const useSources = (notebookId?: string) => {
     onSuccess: async (newSource) => {
       console.log('Source added successfully:', newSource);
       
-      // The Realtime subscription will handle updating the cache
-      // But we still check for first source to trigger generation
-      const currentSources = queryClient.getQueryData(['sources', notebookId]) as any[] || [];
-      const isFirstSource = currentSources.length === 0;
+      // Immediately update the query cache so the UI reflects the new source instantly
+      queryClient.setQueryData(['sources', notebookId], (oldSources: any /* eslint-disable-line @typescript-eslint/no-explicit-any */[] = []) => {
+        // Only add if it doesn't exist
+        if (!oldSources.some(s => s.id === newSource.id)) {
+          return [newSource, ...oldSources];
+        }
+        return oldSources;
+      });
+      
+      // The Realtime subscription will ALSO handle updating the cache, but this avoids race conditions
+      const currentSources = queryClient.getQueryData(['sources', notebookId]) as any /* eslint-disable-line @typescript-eslint/no-explicit-any */[] || [];
+      const isFirstSource = currentSources.length === 1; // It includes the newly added source now
       
       if (isFirstSource && notebookId) {
         console.log('This is the first source, checking notebook generation status...');
@@ -162,13 +156,16 @@ export const useSources = (notebookId?: string) => {
           
           if (canGenerate) {
             try {
-              await generateNotebookContentAsync({
+              // Fire and forget, don't block mutation
+              generateNotebookContentAsync({
                 notebookId,
                 filePath: newSource.file_path || newSource.url,
                 sourceType: newSource.type
+              }).catch(error => {
+                console.error('Failed to generate notebook content:', error);
               });
             } catch (error) {
-              console.error('Failed to generate notebook content:', error);
+              console.error('Failed to start generating notebook content:', error);
             }
           } else {
             console.log('Source not ready for generation yet - missing required data');
@@ -198,11 +195,16 @@ export const useSources = (notebookId?: string) => {
       return data;
     },
     onSuccess: async (updatedSource) => {
-      // The Realtime subscription will handle updating the cache
+      // Immediately update the query cache
+      queryClient.setQueryData(['sources', notebookId], (oldSources: any /* eslint-disable-line @typescript-eslint/no-explicit-any */[] = []) => {
+        return oldSources.map(source => 
+          source.id === updatedSource.id ? { ...source, ...updatedSource } : source
+        );
+      });
       
       // If file_path was added and this is the first source, trigger generation
       if (updatedSource.file_path && notebookId) {
-        const currentSources = queryClient.getQueryData(['sources', notebookId]) as any[] || [];
+        const currentSources = queryClient.getQueryData(['sources', notebookId]) as any /* eslint-disable-line @typescript-eslint/no-explicit-any */[] || [];
         const isFirstSource = currentSources.length === 1;
         
         if (isFirstSource) {
@@ -216,13 +218,16 @@ export const useSources = (notebookId?: string) => {
             console.log('File path updated, triggering notebook content generation...');
             
             try {
-              await generateNotebookContentAsync({
+              // Fire and forget
+              generateNotebookContentAsync({
                 notebookId,
                 filePath: updatedSource.file_path,
                 sourceType: updatedSource.type
+              }).catch(error => {
+                console.error('Failed to generate notebook content:', error);
               });
             } catch (error) {
-              console.error('Failed to generate notebook content:', error);
+              console.error('Failed to start generating notebook content:', error);
             }
           }
         }

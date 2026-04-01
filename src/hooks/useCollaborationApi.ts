@@ -10,7 +10,6 @@ export interface NotebookMember {
   id: string;
   user_id: string;
   role: string;
-  status: string;
   email: string | null;
   full_name: string | null;
   invited_by: string | null;
@@ -34,17 +33,6 @@ interface InviteMemberResponse {
   notebook_id: string;
   user_id: string;
   role: string;
-  status: string;
-}
-
-interface RespondInvitationPayload {
-  member_id: string;
-  response: 'accepted' | 'declined';
-}
-
-interface RespondInvitationResponse {
-  member_id: string;
-  status: string;
 }
 
 interface RemoveMemberPayload {
@@ -83,8 +71,22 @@ async function invokeCollaborationApi<T>(action: string, payload: object = {}): 
     body: { action, ...payload } as Record<string, unknown>,
   });
 
+  // Nếu Edge Function trả về mã lỗi HTTP 4xx, supabase-js sẽ gán vào `error` dưới dạng FunctionsHttpError.
+  // Thử trích xuất nội dung lỗi thực tế do Backend trả về qua error.context (Response object).
   if (error) {
-    throw new Error('Không thể kết nối đến máy chủ');
+    let errorMessage = 'Không thể kết nối đến máy chủ';
+    if (error.name === 'FunctionsHttpError' && 'context' in error) {
+      try {
+        const contextResponse = (error as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).context as Response;
+        const errData = await contextResponse.json();
+        if (errData && errData.error && errData.message) {
+          errorMessage = errData.message;
+        }
+      } catch (e) {
+        // Bỏ qua lỗi parse JSON, giữ nguyên errorMessage mặc định
+      }
+    }
+    throw new Error(errorMessage);
   }
 
   if (data && 'error' in data && data.error === true) {
@@ -130,7 +132,7 @@ export function useInviteMember() {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['notebook-members', variables.notebook_id] });
-      toast.success('✅ Đã gửi lời mời thành công!');
+      toast.success('✅ Đã thêm thành viên thành công!');
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -138,34 +140,6 @@ export function useInviteMember() {
   });
 }
 
-// ============================================================================
-// useRespondInvitation — Mutation for invited user to accept/decline
-// ============================================================================
-
-export function useRespondInvitation() {
-  const queryClient = useQueryClient();
-
-  return useMutation<RespondInvitationResponse, Error, RespondInvitationPayload>({
-    mutationFn: async (payload: RespondInvitationPayload): Promise<RespondInvitationResponse> => {
-      return invokeCollaborationApi<RespondInvitationResponse>('respond_invitation', payload);
-    },
-    onSuccess: (_data, variables) => {
-      // Invalidate invitations, notebooks (shared list may change), and members
-      queryClient.invalidateQueries({ queryKey: ['invitations'] });
-      queryClient.invalidateQueries({ queryKey: ['notebooks'] });
-      queryClient.invalidateQueries({ queryKey: ['notebook-members'] });
-
-      if (variables.response === 'accepted') {
-        toast.success('✅ Đã chấp nhận lời mời!');
-      } else {
-        toast.success('Đã từ chối lời mời');
-      }
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
-}
 
 // ============================================================================
 // useRemoveMember — Mutation to remove a member from a notebook
@@ -183,6 +157,8 @@ export function useRemoveMember() {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['notebook-members', variables.notebook_id] });
+      queryClient.invalidateQueries({ queryKey: ['notebooks'] });
+      queryClient.invalidateQueries({ queryKey: ['my-memberships'] });
       toast.success('✅ Đã xoá thành viên khỏi notebook');
     },
     onError: (error: Error) => {
@@ -213,5 +189,39 @@ export function useUpdateMemberRole() {
     onError: (error: Error) => {
       toast.error(error.message);
     },
+  });
+}
+
+// ============================================================================
+// useSearchUsers — Query users by email or full_name via RPC
+// ============================================================================
+
+export interface SearchUserResult {
+  id: string;
+  email: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
+export function useSearchUsers(searchTerm: string) {
+  return useQuery<SearchUserResult[]>({
+    queryKey: ['search-users', searchTerm],
+    queryFn: async (): Promise<SearchUserResult[]> => {
+      if (!searchTerm || searchTerm.trim().length === 0) return [];
+
+      const { data, error } = await supabase.rpc('search_users', {
+        search_query: searchTerm.trim(),
+        limit_count: 5,
+      });
+
+      if (error) {
+        console.error('Error searching users:', error);
+        throw new Error('Lỗi khi tìm kiếm người dùng. Vui lòng thử lại sau.');
+      }
+
+      return (data as SearchUserResult[]) || [];
+    },
+    enabled: searchTerm.trim().length > 0,
+    staleTime: 60_000,
   });
 }

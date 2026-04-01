@@ -1,44 +1,17 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { getCorsHeaders, corsResponse } from '../_shared/cors.ts'
+import { authenticateRequest } from '../_shared/auth.ts'
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return corsResponse(req);
 
   try {
     // ============ AUTHORIZATION CHECK ============
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const { user, error: authError } = await authenticateRequest(req)
+    if (authError) return authError
 
-    // Verify user identity using their JWT
-    const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
-
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser()
-    if (userError || !user) {
-      console.error('Auth error:', userError)
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log('Authenticated user:', user.id)
     // ============ END AUTHORIZATION CHECK ============
 
     const { notebookId, filePath, sourceType } = await req.json()
@@ -46,7 +19,7 @@ serve(async (req) => {
     if (!notebookId || !sourceType) {
       return new Response(
         JSON.stringify({ error: 'notebookId and sourceType are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       )
     }
 
@@ -56,30 +29,46 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Verify the user owns this notebook
-    const { data: notebook, error: notebookError } = await supabaseClient
-      .from('notebooks')
-      .select('id, user_id')
-      .eq('id', notebookId)
-      .single()
+    // PERF: Fetch notebook info AND member role in PARALLEL
+    // Before: notebook lookup (~200-400ms) → conditional member check (~200-400ms) = ~400-800ms
+    // After:  both in parallel = ~200-400ms total
+    const [notebookResult, memberResult] = await Promise.all([
+      supabaseClient
+        .from('notebooks')
+        .select('id, user_id')
+        .eq('id', notebookId)
+        .single(),
+      supabaseClient
+        .from('notebook_members')
+        .select('role')
+        .eq('notebook_id', notebookId)
+        .eq('user_id', user.id)
+        .maybeSingle(),
+    ]);
+
+    const { data: notebook, error: notebookError } = notebookResult;
 
     if (notebookError || !notebook) {
       console.error('Notebook lookup error:', notebookError)
       return new Response(
         JSON.stringify({ error: 'Notebook not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 404, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       )
     }
 
+    // Check that the user has write access (owner or editor)
     if (notebook.user_id !== user.id) {
-      console.error('User does not own this notebook:', { userId: user.id, ownerId: notebook.user_id })
-      return new Response(
-        JSON.stringify({ error: 'Forbidden - you do not own this notebook' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      const isEditor = memberResult.data?.role === 'editor';
+
+      if (!isEditor) {
+        console.error('User does not have write access:', { userId: user.id, ownerId: notebook.user_id, memberRole: memberResult.data?.role })
+        return new Response(
+          JSON.stringify({ error: 'Forbidden - you do not have write access to this notebook' }),
+          { status: 403, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
-    console.log('Processing request:', { notebookId, filePath, sourceType, userId: user.id });
 
     // Get environment variables
     const webServiceUrl = Deno.env.get('NOTEBOOK_GENERATION_URL')
@@ -93,7 +82,7 @@ serve(async (req) => {
       
       return new Response(
         JSON.stringify({ error: 'Web service configuration missing' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       )
     }
 
@@ -103,10 +92,9 @@ serve(async (req) => {
       .update({ generation_status: 'generating' })
       .eq('id', notebookId)
 
-    console.log('Calling external web service...')
 
     // Prepare payload based on source type
-    let payload: any = {
+    const payload: any /* eslint-disable-line @typescript-eslint/no-explicit-any */ = {
       sourceType: sourceType
     };
 
@@ -126,7 +114,6 @@ serve(async (req) => {
       }
     }
 
-    console.log('Sending payload to web service:', payload);
 
     // Call external web service
     const response = await fetch(webServiceUrl, {
@@ -152,12 +139,11 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ error: 'Failed to generate content from web service' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       )
     }
 
     const generatedData = await response.json()
-    console.log('Generated data:', generatedData)
 
     // Parse the response format: object with output property
     let title, description, notebookIcon, backgroundColor, exampleQuestions;
@@ -179,7 +165,7 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ error: 'Invalid response format from web service' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       )
     }
 
@@ -193,7 +179,7 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ error: 'No title in response from web service' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       )
     }
 
@@ -214,11 +200,10 @@ serve(async (req) => {
       console.error('Notebook update error:', updateError)
       return new Response(
         JSON.stringify({ error: 'Failed to update notebook' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('Successfully updated notebook with example questions:', exampleQuestions)
 
     return new Response(
       JSON.stringify({ 
@@ -230,14 +215,14 @@ serve(async (req) => {
         exampleQuestions,
         message: 'Notebook content generated successfully' 
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
     console.error('Edge function error:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
     )
   }
 })

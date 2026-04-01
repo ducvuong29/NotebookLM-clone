@@ -2,21 +2,32 @@ import React, { useState, useCallback } from 'react';
 import {
   Search,
   Users,
-  FileUp,
   ChevronLeft,
   ChevronRight,
+  Trash2,
+  AlertTriangle,
+  Loader2,
+  ShieldAlert,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import {
   useAdminUsers,
-  useToggleUserStatus,
+  useDeleteUser,
   type AdminUser,
 } from '@/hooks/useAdminUsers';
 import { useDebounce } from '@/hooks/useDebounce';
 import CreateUserDialog from './CreateUserDialog';
 import BulkImportDialog from './BulkImportDialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
 // ============================================================================
 // Constants
@@ -31,8 +42,9 @@ const PAGE_SIZE = 25;
 const SKELETON_WIDTHS = [
   ['w-8', 'w-28'],   // avatar + name
   ['w-36'],          // email
-  ['w-11'],          // toggle
+  ['w-16'],          // role
   ['w-20'],          // date
+  ['w-10'],          // action
 ] as const;
 
 const SkeletonRow: React.FC<{ index: number }> = React.memo(({ index }) => (
@@ -51,13 +63,17 @@ const SkeletonRow: React.FC<{ index: number }> = React.memo(({ index }) => (
     <td className="px-5 py-4">
       <div className={`h-4 bg-muted/50 rounded-md animate-skeleton-pulse ${SKELETON_WIDTHS[1][0]}`} />
     </td>
-    {/* Status */}
+    {/* Role */}
     <td className="px-5 py-4">
-      <div className={`h-6 bg-muted/50 rounded-full animate-skeleton-pulse ${SKELETON_WIDTHS[2][0]}`} />
+      <div className={`h-5 bg-muted/50 rounded-full animate-skeleton-pulse ${SKELETON_WIDTHS[2][0]}`} />
     </td>
     {/* Date */}
     <td className="px-5 py-4">
       <div className={`h-4 bg-muted/50 rounded-md animate-skeleton-pulse ${SKELETON_WIDTHS[3][0]}`} />
+    </td>
+    {/* Action */}
+    <td className="px-5 py-4">
+      <div className={`h-8 bg-muted/50 rounded-md animate-skeleton-pulse ${SKELETON_WIDTHS[4][0]}`} />
     </td>
   </tr>
 ));
@@ -65,22 +81,126 @@ const SkeletonRow: React.FC<{ index: number }> = React.memo(({ index }) => (
 SkeletonRow.displayName = 'SkeletonRow';
 
 // ============================================================================
+// Delete User Confirmation Dialog (2-step)
+// ============================================================================
+
+const DeleteUserDialog: React.FC<{
+  user: AdminUser | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (userId: string) => void;
+  isDeleting: boolean;
+}> = React.memo(({ user, open, onOpenChange, onConfirm, isDeleting }) => {
+  const [confirmText, setConfirmText] = useState('');
+
+  const expectedText = user?.email ?? '';
+  const isConfirmed = confirmText === expectedText;
+
+  // Reset confirm text when dialog opens/closes
+  const handleOpenChange = useCallback((newOpen: boolean) => {
+    if (!newOpen) setConfirmText('');
+    onOpenChange(newOpen);
+  }, [onOpenChange]);
+
+  const handleConfirm = useCallback(() => {
+    if (user && isConfirmed) {
+      onConfirm(user.id);
+    }
+  }, [user, isConfirmed, onConfirm]);
+
+  if (!user) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="h-5 w-5" />
+            Xóa tài khoản vĩnh viễn
+          </DialogTitle>
+          <DialogDescription className="text-left space-y-3 pt-2">
+            <p>
+              Bạn đang xóa tài khoản của{' '}
+              <span className="font-semibold text-foreground">
+                {user.full_name ?? user.email}
+              </span>
+              . Hành động này <strong className="text-destructive">không thể hoàn tác</strong>.
+            </p>
+            <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 space-y-1.5">
+              <p className="text-xs font-medium text-destructive">Dữ liệu sẽ bị xóa vĩnh viễn:</p>
+              <ul className="text-xs text-muted-foreground space-y-0.5 list-disc list-inside">
+                <li>Tài khoản đăng nhập</li>
+                <li>Tất cả notebooks do người dùng tạo</li>
+                <li>Tất cả sources, notes, documents liên quan</li>
+                <li>Lịch sử chat và files đã tải lên</li>
+              </ul>
+            </div>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2 py-2">
+          <Label htmlFor="confirm-delete" className="text-sm">
+            Nhập <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{expectedText}</span> để xác nhận:
+          </Label>
+          <Input
+            id="confirm-delete"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="Nhập email để xác nhận..."
+            disabled={isDeleting}
+            className="bg-background/50"
+            autoComplete="off"
+          />
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button
+            variant="outline"
+            onClick={() => handleOpenChange(false)}
+            disabled={isDeleting}
+          >
+            Hủy
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleConfirm}
+            disabled={!isConfirmed || isDeleting}
+          >
+            {isDeleting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Đang xóa...
+              </>
+            ) : (
+              <>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Xóa vĩnh viễn
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+});
+
+DeleteUserDialog.displayName = 'DeleteUserDialog';
+
+// ============================================================================
 // User Row (memoized to avoid re-render on unrelated state changes)
 // ============================================================================
 
 const UserRow: React.FC<{
   user: AdminUser;
-  onToggle: (userId: string, enabled: boolean) => void;
-  isToggling: boolean;
-}> = React.memo(({ user, onToggle, isToggling }) => {
+  onDelete: (user: AdminUser) => void;
+  isDeleting: boolean;
+}> = React.memo(({ user, onDelete, isDeleting }) => {
   const initial = (user.full_name ?? user.email)?.[0]?.toUpperCase() ?? '?';
+  const isAdmin = user.role === 'admin';
 
-  const handleToggle = useCallback(
-    (checked: boolean) => {
-      onToggle(user.id, checked);
-    },
-    [user.id, onToggle]
-  );
+  const handleDelete = useCallback(() => {
+    onDelete(user);
+  }, [user, onDelete]);
 
   const formatDate = (dateStr: string | null): string => {
     if (!dateStr) return '—';
@@ -100,23 +220,19 @@ const UserRow: React.FC<{
             className={`
               w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0
               text-xs font-bold uppercase tracking-wide
-              ${user.is_disabled
-                ? 'bg-muted/60 text-muted-foreground/60'
-                : 'bg-primary/10 text-primary'
-              }
+              bg-primary/10 text-primary
               transition-colors duration-200
             `}
           >
             {initial}
           </div>
           <div className="min-w-0">
-            <p className={`text-sm font-medium truncate max-w-[200px] ${
-              user.is_disabled ? 'text-muted-foreground line-through' : 'text-foreground'
-            }`}>
+            <p className="text-sm font-medium truncate max-w-[200px] text-foreground">
               {user.full_name ?? '—'}
             </p>
-            {user.role === 'admin' && (
-              <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-widest text-primary/80">
+            {isAdmin && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-primary/80">
+                <ShieldAlert className="h-3 w-3" />
                 Admin
               </span>
             )}
@@ -125,35 +241,43 @@ const UserRow: React.FC<{
       </td>
 
       {/* Email */}
-      <td className={`px-5 py-3.5 text-sm ${
-        user.is_disabled ? 'text-muted-foreground/50' : 'text-muted-foreground'
-      }`}>
+      <td className="px-5 py-3.5 text-sm text-muted-foreground">
         <span className="truncate block max-w-[240px]">{user.email}</span>
       </td>
 
-      {/* Status toggle */}
+      {/* Role badge */}
       <td className="px-5 py-3.5">
-        <div className="flex items-center gap-2.5">
-          <Switch
-            checked={!user.is_disabled}
-            onCheckedChange={handleToggle}
-            disabled={isToggling || user.role === 'admin'}
-            aria-label={user.is_disabled ? 'Kích hoạt tài khoản' : 'Vô hiệu hóa tài khoản'}
-            className="data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-destructive/40"
-          />
-          <span className={`text-xs font-medium ${
-            user.is_disabled
-              ? 'text-destructive/70'
-              : 'text-emerald-600 dark:text-emerald-400'
-          }`}>
-            {user.is_disabled ? 'Đã khóa' : 'Hoạt động'}
-          </span>
-        </div>
+        <span className={`
+          inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-wide
+          ${isAdmin
+            ? 'bg-primary/10 text-primary border border-primary/20'
+            : 'bg-muted text-muted-foreground border border-border/30'
+          }
+        `}>
+          {isAdmin ? 'Admin' : 'User'}
+        </span>
       </td>
 
       {/* Last sign in */}
       <td className="px-5 py-3.5 text-sm text-muted-foreground">
         {formatDate(user.last_sign_in_at)}
+      </td>
+
+      {/* Delete action */}
+      <td className="px-5 py-3.5">
+        {!isAdmin && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10
+                       opacity-0 group-hover:opacity-100 transition-all duration-200"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            title="Xóa tài khoản"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </td>
     </tr>
   );
@@ -167,7 +291,7 @@ UserRow.displayName = 'UserRow';
 
 const EmptyState: React.FC<{ hasSearch: boolean }> = React.memo(({ hasSearch }) => (
   <tr>
-    <td colSpan={4} className="px-5 py-16 text-center">
+    <td colSpan={5} className="px-5 py-16 text-center">
       <div className="flex flex-col items-center gap-4">
         <div className="p-4 rounded-2xl bg-muted/30 border border-border/30">
           <Users className="h-9 w-9 text-muted-foreground/35" />
@@ -205,7 +329,7 @@ EmptyState.displayName = 'EmptyState';
 
 const ErrorState: React.FC = React.memo(() => (
   <tr>
-    <td colSpan={4} className="px-5 py-16 text-center">
+    <td colSpan={5} className="px-5 py-16 text-center">
       <div className="flex flex-col items-center gap-3">
         <div className="p-3 rounded-xl bg-destructive/10">
           <Users className="h-7 w-7 text-destructive/60" />
@@ -230,6 +354,8 @@ ErrorState.displayName = 'ErrorState';
 const UserTable: React.FC = () => {
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -243,14 +369,24 @@ const UserTable: React.FC = () => {
     searchQuery: effectiveSearch,
   });
 
-  const toggleMutation = useToggleUserStatus();
+  const deleteMutation = useDeleteUser();
 
-  const handleToggle = useCallback(
-    (userId: string, enabled: boolean) => {
-      toggleMutation.mutate({ user_id: userId, enabled });
-    },
-    [toggleMutation]
-  );
+  const handleDeleteClick = useCallback((user: AdminUser) => {
+    setDeleteTarget(user);
+    setIsDialogOpen(true);
+  }, []);
+
+  const handleDeleteConfirm = useCallback((userId: string) => {
+    deleteMutation.mutate(
+      { user_id: userId },
+      {
+        onSuccess: () => {
+          setIsDialogOpen(false);
+          setDeleteTarget(null);
+        },
+      }
+    );
+  }, [deleteMutation]);
 
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -317,13 +453,19 @@ const UserTable: React.FC = () => {
                   className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5"
                   scope="col"
                 >
-                  Trạng thái
+                  Vai trò
                 </th>
                 <th
                   className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5"
                   scope="col"
                 >
                   Lần đăng nhập cuối
+                </th>
+                <th
+                  className="text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-5 py-3.5 w-16"
+                  scope="col"
+                >
+                  {/* Action column */}
                 </th>
               </tr>
             </thead>
@@ -340,8 +482,8 @@ const UserTable: React.FC = () => {
                   <UserRow
                     key={user.id}
                     user={user}
-                    onToggle={handleToggle}
-                    isToggling={toggleMutation.isPending}
+                    onDelete={handleDeleteClick}
+                    isDeleting={deleteMutation.isPending}
                   />
                 ))
               ) : (
@@ -395,6 +537,15 @@ const UserTable: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteUserDialog
+        user={deleteTarget}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={deleteMutation.isPending}
+      />
     </div>
   );
 };

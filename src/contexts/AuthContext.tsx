@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
@@ -172,6 +173,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       mounted = false;
       subscription.unsubscribe();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array to run only once
 
   const value: AuthContextType = {

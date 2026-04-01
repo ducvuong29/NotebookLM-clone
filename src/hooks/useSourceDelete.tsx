@@ -17,7 +17,7 @@ export const useSourceDelete = () => {
         // First, get the source details including file information
         const { data: source, error: fetchError } = await supabase
           .from('sources')
-          .select('id, title, file_path, type')
+          .select('id, title, file_path, type, notebook_id')
           .eq('id', sourceId)
           .single();
 
@@ -67,13 +67,16 @@ export const useSourceDelete = () => {
     },
     onSuccess: (deletedSource) => {
       console.log('Delete mutation success, invalidating queries');
-      queryClient.invalidateQueries({ queryKey: ['sources'] });
+      // BUG-03 fix: Scope invalidation to the specific notebook.
+      // Before: ['sources'] matched ALL notebook source caches → 400 tabs refetch.
+      // After: ['sources', notebook_id] only refreshes the affected notebook.
+      queryClient.invalidateQueries({ queryKey: ['sources', deletedSource?.notebook_id] });
       toast({
         title: "Đã xóa nguồn",
         description: `"${deletedSource?.title || 'Nguồn'}" đã được xóa thành công.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
       console.error('Delete mutation error:', error);
       
       let errorMessage = "Không thể xóa nguồn. Vui lòng thử lại.";

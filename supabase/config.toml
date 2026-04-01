@@ -73,6 +73,12 @@ verify_jwt = false
 [functions.generate-note-title]
 verify_jwt = false
 
+[functions.admin-api]
+verify_jwt = false
+
+[functions.collaboration-api]
+verify_jwt = false
+
 # ============ CALLBACK FUNCTIONS ============
 # Called by external webhooks (n8n), no user context available
 

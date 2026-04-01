@@ -21,10 +21,10 @@ interface N8nMessageFormat {
       excerpt?: string;
     }>;
   };
-  additional_kwargs?: any;
-  response_metadata?: any;
-  tool_calls?: any[];
-  invalid_tool_calls?: any[];
+  additional_kwargs?: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
+  response_metadata?: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
+  tool_calls?: any /* eslint-disable-line @typescript-eslint/no-explicit-any */[];
+  invalid_tool_calls?: any /* eslint-disable-line @typescript-eslint/no-explicit-any */[];
 }
 
 // Type for the AI response structure from n8n
@@ -40,6 +40,7 @@ interface N8nAiResponseContent {
   }>;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const transformMessage = (item: any, sourceMap: Map<string, any>): EnhancedChatMessage => {
   
   let transformedMessage: EnhancedChatMessage['message'];
@@ -57,9 +58,52 @@ const transformMessage = (item: any, sourceMap: Map<string, any>): EnhancedChatM
     // Check if this is an AI message with JSON content that needs parsing
     if (messageObj.type === 'ai' && typeof messageObj.content === 'string') {
       try {
-        const parsedContent = JSON.parse(messageObj.content) as N8nAiResponseContent;
+        // Many LLMs wrap JSON responses in markdown code blocks or add preamble text.
+        let contentToParse = messageObj.content.trim();
         
-        if (parsedContent.output && Array.isArray(parsedContent.output)) {
+        // 1. Try to extract from Markdown code block
+        const codeBlockMatch = contentToParse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        if (codeBlockMatch && codeBlockMatch[1]) {
+          contentToParse = codeBlockMatch[1].trim();
+        } else {
+          // 2. Fallback: try to find the first { and last }
+          const firstBrace = contentToParse.indexOf('{');
+          const lastBrace = contentToParse.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            contentToParse = contentToParse.substring(firstBrace, lastBrace + 1);
+          }
+        }
+        
+        let parsedContent: N8nAiResponseContent | null = null;
+        
+        // 3. Try parsing, if it fails, try stripping trailing characters (like extra } injected by LLM)
+        try {
+          parsedContent = JSON.parse(contentToParse) as N8nAiResponseContent;
+        } catch (initialError) {
+          // LLM might have output extra closing braces or garbage at the end
+          let recovered = false;
+          let tempContent = contentToParse;
+          // Try stripping up to 5 characters from the end
+          for (let i = 0; i < 5; i++) {
+            tempContent = tempContent.slice(0, -1);
+            try {
+              if (tempContent.length > 0 && tempContent.endsWith('}')) {
+                parsedContent = JSON.parse(tempContent) as N8nAiResponseContent;
+                recovered = true;
+                contentToParse = tempContent;
+                break;
+              }
+            } catch (e) {
+              // Ignore and continue stripping
+            }
+          }
+          
+          if (!recovered) {
+            throw initialError; // Re-throw to hit the main catch block
+          }
+        }
+        
+        if (parsedContent && parsedContent.output && Array.isArray(parsedContent.output)) {
           // Transform the parsed content into segments and citations
           const segments: MessageSegment[] = [];
           const citations: Citation[] = [];
@@ -114,15 +158,70 @@ const transformMessage = (item: any, sourceMap: Map<string, any>): EnhancedChatM
           };
         }
       } catch (parseError) {
-        // If parsing fails, treat as regular string content
-        transformedMessage = {
-          type: 'ai',
-          content: messageObj.content,
-          additional_kwargs: messageObj.additional_kwargs,
-          response_metadata: messageObj.response_metadata,
-          tool_calls: messageObj.tool_calls,
-          invalid_tool_calls: messageObj.invalid_tool_calls
-        };
+        // Fallback: try to extract inline citations from plain text
+        // AI returns citations in various formats depending on the model mood:
+        // Format 1: (Nguồn: chunk_index 0, source_id uuid, lines from 55 to 136)
+        // Format 2: [chunk_index:0, chunk_source_id:"uuid", chunk_lines_from:106, chunk_lines_to:289]
+        const regexPatterns = [
+          /\((?:Nguồn|Source|Ref):\s*chunk_index\s*(\d+),\s*source_id\s*([\w-]+),\s*lines?\s*from\s*(\d+)\s*to\s*(\d+)\)/gi,
+          /\[chunk_index:\s*(\d+),\s*chunk_source_id:\s*"?([\w-]+)"?,\s*chunk_lines_from:\s*(\d+),\s*chunk_lines_to:\s*(\d+)\]/gi,
+        ];
+        
+        let matches: RegExpMatchArray[] = [];
+        for (const regex of regexPatterns) {
+          matches = [...messageObj.content.matchAll(regex)];
+          if (matches.length > 0) break;
+        }
+        
+        if (matches.length > 0) {
+          // Strip inline citations from text and build proper citation objects
+          let cleanText = messageObj.content;
+          const fallbackCitations: Citation[] = [];
+          let fallbackCitationId = 1;
+          
+          for (const match of matches) {
+            cleanText = cleanText.replace(match[0], ` [${fallbackCitationId}]`);
+            const sourceInfo = sourceMap.get(match[2]);
+            fallbackCitations.push({
+              citation_id: fallbackCitationId,
+              source_id: match[2],
+              source_title: sourceInfo?.title || 'Unknown Source',
+              source_type: sourceInfo?.type || 'pdf',
+              chunk_lines_from: parseInt(match[3], 10),
+              chunk_lines_to: parseInt(match[4], 10),
+              chunk_index: parseInt(match[1], 10),
+              excerpt: `Lines ${match[3]}-${match[4]}`
+            });
+            fallbackCitationId++;
+          }
+          
+          const fallbackSegments: MessageSegment[] = [{
+            text: cleanText.trim(),
+            citation_id: fallbackCitations.length > 0 ? 1 : undefined
+          }];
+          
+          transformedMessage = {
+            type: 'ai',
+            content: {
+              segments: fallbackSegments,
+              citations: fallbackCitations
+            },
+            additional_kwargs: messageObj.additional_kwargs,
+            response_metadata: messageObj.response_metadata,
+            tool_calls: messageObj.tool_calls,
+            invalid_tool_calls: messageObj.invalid_tool_calls
+          };
+        } else {
+          // No inline citations found either, treat as plain text
+          transformedMessage = {
+            type: 'ai',
+            content: messageObj.content,
+            additional_kwargs: messageObj.additional_kwargs,
+            response_metadata: messageObj.response_metadata,
+            tool_calls: messageObj.tool_calls,
+            invalid_tool_calls: messageObj.invalid_tool_calls
+          };
+        }
       }
     } else {
       // Handle non-AI messages or AI messages that don't need parsing
@@ -224,7 +323,7 @@ export const useChatMessages = (notebookId?: string) => {
         },
         async (payload) => {
           // Retrieve sources from React Query cache instead of DB to avoid N+1 queries
-          const sourceMap = queryClient.getQueryData<Map<string, any>>(['sources-map', notebookId]) || new Map();
+          const sourceMap = queryClient.getQueryData<Map<string, any /* eslint-disable-line @typescript-eslint/no-explicit-any */>>(['sources-map', notebookId]) || new Map();
           
           // Transform the new message
           const newMessage = transformMessage(payload.new, sourceMap);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Newspaper, Plus, Loader2, Book, ExternalLink, Trash2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -152,7 +153,7 @@ function useDeleteNotebook() {
 function useToggleVisibility() {
   const queryClient = useQueryClient();
 
-  return useMutation<ToggleVisibilityResponse, Error, ToggleVisibilityPayload, { previousNotebooks: any }>({
+  return useMutation<ToggleVisibilityResponse, Error, ToggleVisibilityPayload, { previousNotebooks: any /* eslint-disable-line @typescript-eslint/no-explicit-any */ }>({
     mutationFn: toggleVisibility,
     onMutate: async (payload) => {
       // Cancel any outgoing refetches
@@ -162,9 +163,9 @@ function useToggleVisibility() {
       const previousNotebooks = queryClient.getQueryData(['admin-notebooks']);
 
       // Optimistically update to the new value
-      queryClient.setQueryData(['admin-notebooks'], (old: any) => {
+      queryClient.setQueryData(['admin-notebooks'], (old: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
         if (!old) return old;
-        return old.map((nb: any) => 
+        return old.map((nb: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => 
           nb.id === payload.notebook_id 
             ? { ...nb, visibility: payload.visibility }
             : nb
@@ -190,15 +191,18 @@ function useToggleVisibility() {
   });
 }
 
-function useAdminNotebooks() {
+function useAdminNotebooks(userId: string | undefined) {
   return useQuery({
-    queryKey: ['admin-notebooks'],
+    queryKey: ['admin-notebooks', userId],
     queryFn: async () => {
-      // Admin can see all notebooks they own — admin-bypass RLS policies
-      // ensure this query works for both public and private notebooks
+      if (!userId) return [];
+
+      // Only fetch notebooks owned by the current admin user
+      // This ensures admin cannot see/toggle shared notebooks they don't own
       const { data, error } = await supabase
         .from('notebooks')
         .select('*')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -206,6 +210,7 @@ function useAdminNotebooks() {
       }
       return data || [];
     },
+    enabled: !!userId,
   });
 }
 
@@ -216,8 +221,9 @@ function useAdminNotebooks() {
 const PublicNotebooksView: React.FC = () => {
   const [title, setTitle] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
+  const { user } = useAuth();
   const { mutate, isPending } = useCreateNotebook();
-  const { data: notebooks, isLoading } = useAdminNotebooks();
+  const { data: notebooks, isLoading } = useAdminNotebooks(user?.id);
   const { mutate: deleteNb, isPending: isDeleting } = useDeleteNotebook();
   const { mutate: toggleVis, isPending: isToggling } = useToggleVisibility();
   const navigate = useNavigate();

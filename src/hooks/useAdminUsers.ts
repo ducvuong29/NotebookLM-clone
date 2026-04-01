@@ -13,7 +13,6 @@ export interface AdminUser {
   role: string;
   created_at: string;
   last_sign_in_at: string | null;
-  is_disabled: boolean;
 }
 
 interface CreateUserPayload {
@@ -55,7 +54,19 @@ async function invokeAdminApi<T>(action: string, payload: object = {}): Promise<
   });
 
   if (error) {
-    throw new Error('Không thể kết nối đến máy chủ');
+    let errorMessage = 'Không thể kết nối đến máy chủ';
+    if (error.name === 'FunctionsHttpError' && 'context' in error) {
+      try {
+        const contextResponse = (error as any /* eslint-disable-line @typescript-eslint/no-explicit-any */).context as Response;
+        const errData = await contextResponse.json();
+        if (errData && errData.error && errData.message) {
+          errorMessage = errData.message;
+        }
+      } catch (e) {
+        // Fallback
+      }
+    }
+    throw new Error(errorMessage);
   }
 
   if (data && 'error' in data && data.error === true) {
@@ -81,15 +92,23 @@ export function useAdminUsers({ page, pageSize, searchQuery }: UseAdminUsersPara
   return useQuery<PaginatedUsersResult>({
     queryKey: ['admin-users', page, pageSize, searchQuery],
     queryFn: async (): Promise<PaginatedUsersResult> => {
-      const result = await invokeAdminApi<ListUsersResponse>('list_users', {
-        page,
-        perPage: pageSize,
-        search: searchQuery,
+      const { data, error } = await supabase.rpc('get_admin_users', {
+        page_num: page,
+        page_size: pageSize,
+        search_query: searchQuery,
       });
 
+      if (error) {
+        throw new Error('Không thể tải danh sách người dùng');
+      }
+
+      // data contains an array of users, each row also includes the window function total_count
+      const users = (data || []) as (AdminUser & { total_count: number })[];
+      const totalCount = users.length > 0 ? Number(users[0].total_count) : 0;
+
       return {
-        users: result.users,
-        totalCount: result.total,
+        users,
+        totalCount,
       };
     },
     staleTime: 30_000, // 30s — shorter for paginated data
@@ -105,53 +124,48 @@ export function useAdminUsersCount() {
   return useQuery<{ total: number; admins: number }>({
     queryKey: ['admin-users-count'],
     queryFn: async () => {
-      const { count: total, error: totalError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
+      const [totalRes, adminRes] = await Promise.all([
+        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'admin')
+      ]);
 
-      if (totalError) throw new Error('Không thể tải dữ liệu');
+      if (totalRes.error || adminRes.error) {
+        throw new Error('Không thể tải dữ liệu');
+      }
 
-      const { count: admins, error: adminError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('role', 'admin');
-
-      if (adminError) throw new Error('Không thể tải dữ liệu');
-
-      return { total: total ?? 0, admins: admins ?? 0 };
+      return { 
+        total: totalRes.count ?? 0, 
+        admins: adminRes.count ?? 0 
+      };
     },
     staleTime: 2 * 60 * 1000,
   });
 }
 
 // ============================================================================
-// useToggleUserStatus — Enable/disable user via admin-api
+// useDeleteUser — Permanently delete user via admin-api
 // ============================================================================
 
-interface ToggleUserStatusPayload {
+interface DeleteUserPayload {
   user_id: string;
-  enabled: boolean;
 }
 
-interface ToggleUserStatusResponse {
+interface DeleteUserResponse {
   user_id: string;
-  enabled: boolean;
+  deleted: boolean;
 }
 
-export function useToggleUserStatus() {
+export function useDeleteUser() {
   const queryClient = useQueryClient();
 
-  return useMutation<ToggleUserStatusResponse, Error, ToggleUserStatusPayload>({
-    mutationFn: async (payload: ToggleUserStatusPayload): Promise<ToggleUserStatusResponse> => {
-      return invokeAdminApi<ToggleUserStatusResponse>('toggle_user_status', payload);
+  return useMutation<DeleteUserResponse, Error, DeleteUserPayload>({
+    mutationFn: async (payload: DeleteUserPayload): Promise<DeleteUserResponse> => {
+      return invokeAdminApi<DeleteUserResponse>('delete_user', payload);
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      if (variables.enabled) {
-        toast.success('✅ Tài khoản đã được kích hoạt lại');
-      } else {
-        toast.success('⛔ Tài khoản đã bị vô hiệu hóa');
-      }
+      queryClient.invalidateQueries({ queryKey: ['admin-users-count'] });
+      toast.success('✅ Đã xóa tài khoản thành công');
     },
     onError: (error: Error) => {
       toast.error(error.message);

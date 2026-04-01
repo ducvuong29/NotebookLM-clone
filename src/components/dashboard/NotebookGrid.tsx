@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const NotebookGrid = () => {
   const {
     notebooks,
+    myMemberships,
     isLoading,
     createNotebook,
     isCreating
@@ -43,19 +44,20 @@ const NotebookGrid = () => {
         canDelete: notebook.user_id === user?.id,
       };
 
-      // Public section = notebooks with visibility 'public' AND owned by OTHER users
-      if (notebook.visibility === 'public' && notebook.user_id !== user?.id) {
-        publicList.push({ ...formatted, canDelete: false });
-      } else if (notebook.user_id !== user?.id) {
-        // Shared section = private notebooks owned by other users
-        sharedList.push({ ...formatted, canDelete: false });
-      } else {
+      // Public section = all notebooks with visibility 'public'
+      if (notebook.visibility === 'public') {
+        publicList.push(formatted);
+      } else if (notebook.user_id !== user?.id && myMemberships?.has(notebook.id)) {
+        // Shared section = private notebooks where user is a member
+        sharedList.push(formatted);
+      } else if (notebook.user_id === user?.id) {
+        // Private section = private notebooks owned by the current user
         privateList.push(formatted);
       }
     }
 
     return { publicNotebooks: publicList, privateNotebooks: privateList, sharedNotebooks: sharedList };
-  }, [notebooks, user?.id]);
+  }, [notebooks, myMemberships, user?.id]);
 
   const handleCreateNotebook = () => {
     createNotebook({

@@ -16,7 +16,7 @@ import { useSourceUpdate } from '@/hooks/useSourceUpdate';
 interface RenameSourceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  source: any;
+  source: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
   notebookId?: string;
 }
 

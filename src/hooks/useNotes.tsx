@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export interface Note {
   id: string;
   notebook_id: string;
+  user_id: string;
   title: string;
   content: string;
   source_type: 'user' | 'ai_response';
