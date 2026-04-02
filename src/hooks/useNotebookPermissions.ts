@@ -13,7 +13,11 @@ export interface NotebookPermissions {
   isLoading: boolean;
 }
 
-export function useNotebookPermissions(notebookId: string | undefined, notebookOwnerId?: string): NotebookPermissions {
+export function useNotebookPermissions(
+  notebookId: string | undefined,
+  notebookOwnerId?: string,
+  notebookVisibility?: string
+): NotebookPermissions {
   const { user } = useAuth();
   const { data: members, isLoading } = useNotebookMembers(notebookId);
 
@@ -22,12 +26,14 @@ export function useNotebookPermissions(notebookId: string | undefined, notebookO
   const memberRole = memberRecord?.role as 'editor' | 'viewer' | undefined;
 
   const role = isNotebookOwner ? 'owner' : memberRole ?? null;
+  const isPublic = notebookVisibility === 'public';
   
   const canEdit = role === 'owner' || role === 'editor';
   const canDelete = role === 'owner' || role === 'editor'; // Allow editors to delete sources and notes
   const canInvite = role === 'owner';
-  const canChat = role !== null;
-  const canView = role !== null;
+  // Public notebook visitors (logged-in but no role) can chat and view
+  const canChat = role !== null || isPublic;
+  const canView = role !== null || isPublic;
   const isOwner = role === 'owner';
   const isMember = role !== null;
 

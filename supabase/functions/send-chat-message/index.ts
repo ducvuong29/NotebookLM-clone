@@ -59,7 +59,7 @@ serve(async (req) => {
         .maybeSingle(),
       supabaseAdmin
         .from('notebooks')
-        .select('user_id')
+        .select('user_id, visibility')
         .eq('id', notebook_id)
         .maybeSingle(),
       supabaseAdmin
@@ -76,16 +76,18 @@ serve(async (req) => {
     const isAdmin = profileCheck?.role === 'admin';
     const isOwner = ownerCheck?.user_id === user_id;
     const isMember = !!memberCheck;
+    const isPublicNotebook = ownerCheck?.visibility === 'public';
     const memberRole = isAdmin ? 'admin' : (isOwner ? 'owner' : memberCheck?.role);
 
-    if (!isAdmin && !isOwner && !isMember) {
+    // Allow access for: admin, owner, member, OR authenticated user on public notebook
+    if (!isAdmin && !isOwner && !isMember && !isPublicNotebook) {
       return new Response(
         JSON.stringify({ error: 'You do not have access to this notebook' }),
         { status: 403, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       );
     }
 
-    // All roles can chat: owner, editor, viewer
+    // All roles can chat: owner, editor, viewer, public visitor
     // Chat is a read operation — asking AI about existing sources
 
 

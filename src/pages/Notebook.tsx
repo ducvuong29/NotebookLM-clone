@@ -38,7 +38,7 @@ const Notebook = () => {
     isMember,
     isOwner,
     isLoading: permissionsLoading,
-  } = useNotebookPermissions(notebookId, notebook?.user_id);
+  } = useNotebookPermissions(notebookId, notebook?.user_id, notebook?.visibility);
 
   const handleCitationClick = (citation: Citation) => {
     setSelectedCitation(citation);
