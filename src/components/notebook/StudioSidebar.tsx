@@ -383,7 +383,7 @@ const StudioSidebar = ({
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="max-h-[300px] border-t border-border/50">
+            <div className="max-h-[300px] overflow-y-auto border-t border-border/50">
               {hasLoadedActivity && (
                 <Suspense fallback={
                   <div className="flex items-center justify-center py-8">

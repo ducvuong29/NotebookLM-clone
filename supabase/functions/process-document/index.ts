@@ -76,19 +76,9 @@ serve(async (req) => {
     }
 
 
-    // Await logging activity so Deno runtime doesn't kill it before completion
-    const { error: logErr } = await supabaseClient
-      .from('activity_log')
-      .insert({
-        notebook_id: source.notebook_id,
-        actor_id: user!.id,
-        action_type: 'source_added',
-        metadata: { source_id: sourceId, source_type: sourceType },
-      });
-    
-    if (logErr) {
-      console.error('[activity-log] source_added insert failed:', logErr.message);
-    }
+    // Activity logging for source_added is now automatically handled by a Postgres trigger
+    // defined in 20260401170956_fix_source_added_trigger.sql
+
 
     // Get environment variables
     const webhookUrl = Deno.env.get('DOCUMENT_PROCESSING_WEBHOOK_URL')

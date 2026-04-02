@@ -101,7 +101,7 @@ function formatActionText(entry: ActivityLogEntry, config: ActionConfig): string
     case 'source_deleted':
       return `đã xoá nguồn "${meta?.source_title || 'không rõ'}"`;
     case 'source_added':
-      return `đã thêm nguồn ${meta?.source_type ? `(${meta.source_type})` : ''}`;
+      return `đã thêm nguồn "${meta?.source_title || 'không rõ'}" ${meta?.source_type ? `(${meta.source_type})` : ''}`;
     case 'source_updated':
       return `đã đổi tên nguồn thành "${meta?.new_title}"`;
     case 'note_updated':
