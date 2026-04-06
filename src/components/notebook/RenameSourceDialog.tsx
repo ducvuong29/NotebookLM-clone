@@ -12,11 +12,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useSourceUpdate } from '@/hooks/useSourceUpdate';
+import type { Database } from '@/integrations/supabase/types';
+
+type SourceRecord = Database['public']['Tables']['sources']['Row'];
 
 interface RenameSourceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  source: any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
+  source: SourceRecord | null;
   notebookId?: string;
 }
 

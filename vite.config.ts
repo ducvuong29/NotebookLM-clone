@@ -19,5 +19,6 @@ export default defineConfig(({ mode }) => ({
     environment: "jsdom",
     setupFiles: "./tests/setup.ts",
     css: true,
+    include: ['tests/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
   },
 }));

@@ -1,4 +1,3 @@
-
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -6,9 +5,13 @@ export const useNotebookUpdate = () => {
   const queryClient = useQueryClient();
 
   const updateNotebook = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: { title?: string; description?: string } }) => {
-      console.log('Updating notebook:', id, updates);
-      
+    mutationFn: async ({
+      id,
+      updates,
+    }: {
+      id: string;
+      updates: { title?: string; description?: string };
+    }) => {
       const { data, error } = await supabase
         .from('notebooks')
         .update(updates)
@@ -20,12 +23,10 @@ export const useNotebookUpdate = () => {
         console.error('Error updating notebook:', error);
         throw error;
       }
-      
-      console.log('Notebook updated successfully:', data);
+
       return data;
     },
     onSuccess: (data) => {
-      console.log('Mutation success, invalidating queries');
       queryClient.invalidateQueries({ queryKey: ['notebook', data.id] });
       queryClient.invalidateQueries({ queryKey: ['notebooks'] });
     },

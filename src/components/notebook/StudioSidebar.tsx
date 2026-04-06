@@ -103,10 +103,6 @@ const StudioSidebar = ({
   };
 
   const handleEditNote = (note: Note) => {
-    console.log('StudioSidebar: Opening note', {
-      noteId: note.id,
-      sourceType: note.source_type
-    });
     setEditingNote(note);
     setIsCreatingNote(false);
   };

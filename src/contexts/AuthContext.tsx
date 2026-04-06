@@ -34,7 +34,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [error, setError] = useState<string | null>(null);
 
   const updateAuthState = (newSession: Session | null) => {
-    console.log('AuthContext: Updating auth state:', newSession?.user?.email || 'No session');
     setSession(newSession);
     setUser(newSession?.user ?? null);
     
@@ -45,7 +44,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const clearAuthState = () => {
-    console.log('AuthContext: Clearing auth state');
     setSession(null);
     setUser(null);
     setError(null);
@@ -53,8 +51,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signOut = async () => {
     try {
-      console.log('AuthContext: Starting logout process...');
-      
       // Clear local state immediately to provide instant feedback
       clearAuthState();
       
@@ -62,13 +58,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        console.log('AuthContext: Logout error:', error);
-        
         // If session is invalid on server, we've already cleared local state
         if (error.message.includes('session_not_found') || 
             error.message.includes('Session not found') ||
             error.status === 403) {
-          console.log('AuthContext: Session already invalid on server');
           return;
         }
         
@@ -76,8 +69,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         await supabase.auth.signOut({ scope: 'local' });
         return;
       }
-      
-      console.log('AuthContext: Logout successful');
     } catch (err) {
       console.error('AuthContext: Unexpected logout error:', err);
       
@@ -97,9 +88,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         if (!mounted) return;
-        
-        console.log('AuthContext: Auth state changed:', event, newSession?.user?.email || 'No session');
-        
+
         // Handle sign out events
         if (event === 'SIGNED_OUT') {
           clearAuthState();
@@ -125,8 +114,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     const initializeAuth = async () => {
       try {
-        console.log('AuthContext: Initializing auth...');
-        
         // Get initial session
         const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
         
@@ -136,7 +123,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           // If the session is invalid, clear local state
           if (sessionError.message.includes('session_not_found') || 
               sessionError.message.includes('Session not found')) {
-            console.log('AuthContext: Session not found on server, clearing local session');
             await supabase.auth.signOut({ scope: 'local' });
             if (mounted) {
               clearAuthState();
@@ -153,7 +139,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
         
         if (mounted) {
-          console.log('AuthContext: Initial session:', initialSession?.user?.email || 'No session');
           updateAuthState(initialSession);
           setLoading(false);
         }

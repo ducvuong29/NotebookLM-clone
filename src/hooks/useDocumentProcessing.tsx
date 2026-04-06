@@ -51,10 +51,7 @@ export const useDocumentProcessing = () => {
       return baseDelay + jitter;
     },
 
-
-    onSuccess: (data) => {
-      console.log('Document processing initiated successfully:', data);
-    },
+    onSuccess: () => undefined,
     onError: (error) => {
       console.error('Failed to initiate document processing:', error);
       toast({

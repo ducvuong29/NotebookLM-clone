@@ -215,7 +215,7 @@
   }
 
   /* Global Focus Visible Indicator */
-  :focus-visible {
+  *:focus-visible {
     @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
   }
 
@@ -225,6 +225,23 @@
   samp {
     font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 13px;
+  }
+}
+
+@layer utilities {
+  .transition-panel {
+    transition: transform var(--duration-normal) var(--ease-out),
+                opacity var(--duration-fast) var(--ease-out);
+  }
+  .transition-fade {
+    transition: opacity var(--duration-fast) var(--ease-out);
+  }
+  .transition-scale {
+    transition: transform var(--duration-fast) var(--ease-out),
+                opacity var(--duration-fast) var(--ease-out);
+  }
+  .animate-fade-in {
+    animation: fade-in var(--duration-fast) var(--ease-out) both;
   }
 }
 
@@ -252,6 +269,11 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .transition-panel, .transition-fade, .transition-scale, .animate-fade-in {
+    transition: none !important;
+    animation: none !important;
   }
 
   .animate-skeleton-pulse {

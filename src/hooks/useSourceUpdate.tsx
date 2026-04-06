@@ -1,18 +1,13 @@
-
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 export const useSourceUpdate = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const { toast } = useToast();
 
   const updateSource = useMutation({
     mutationFn: async ({ sourceId, title }: { sourceId: string; title: string }) => {
-      console.log('Updating source:', sourceId, 'with title:', title);
-      
       const { data, error } = await supabase
         .from('sources')
         .update({ title })
@@ -24,23 +19,21 @@ export const useSourceUpdate = () => {
         console.error('Error updating source:', error);
         throw error;
       }
-      
-      console.log('Source updated successfully');
+
       return data;
     },
     onSuccess: () => {
-      console.log('Update mutation success, invalidating queries');
       queryClient.invalidateQueries({ queryKey: ['sources'] });
       toast({
-        title: "Đã đổi tên nguồn",
-        description: "Nguồn đã được đổi tên thành công.",
+        title: "\u0110\u00e3 \u0111\u1ed5i t\u00ean ngu\u1ed3n",
+        description: "Ngu\u1ed3n \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u1ed5i t\u00ean th\u00e0nh c\u00f4ng.",
       });
     },
     onError: (error) => {
       console.error('Update mutation error:', error);
       toast({
-        title: "Lỗi",
-        description: "Không thể đổi tên nguồn. Vui lòng thử lại.",
+        title: "L\u1ed7i",
+        description: "Kh\u00f4ng th\u1ec3 \u0111\u1ed5i t\u00ean ngu\u1ed3n. Vui l\u00f2ng th\u1eed l\u1ea1i.",
         variant: "destructive",
       });
     },

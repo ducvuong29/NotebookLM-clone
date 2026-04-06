@@ -43,7 +43,6 @@ const NoteEditor = ({ note, onSave, onDelete, onCancel, isLoading, onCitationCli
     if (readOnly) return;
     // Only allow editing of user notes, not AI responses
     if (note?.source_type === 'ai_response') {
-      console.log('NoteEditor: Cannot edit AI response note');
       return;
     }
     setIsEditing(true);

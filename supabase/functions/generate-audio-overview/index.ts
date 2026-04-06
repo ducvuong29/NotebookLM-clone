@@ -115,7 +115,6 @@ serve(async (req) => {
               .from('notebooks')
               .update({ audio_overview_generation_status: 'failed' })
               .eq('id', notebookId)
-          } else {
           }
         } catch (error) {
           console.error('Background audio generation error:', error)

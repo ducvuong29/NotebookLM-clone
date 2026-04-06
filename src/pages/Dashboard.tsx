@@ -4,7 +4,7 @@ import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import NotebookGrid from "@/components/dashboard/NotebookGrid";
 import EmptyDashboard from "@/components/dashboard/EmptyDashboard";
 import SearchBar from "@/components/dashboard/SearchBar";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonScreen } from "@/components/ui/SkeletonScreen";
 import { useNotebooks } from "@/hooks/useNotebooks";
 import { useRealtimeMembership } from "@/hooks/useRealtimeMembership";
 import { useNotebookSearch } from "@/hooks/useNotebookSearch";
@@ -13,23 +13,13 @@ import { useAuth } from "@/contexts/AuthContext";
 // [bundle-dynamic-imports] Lazy-load SearchResults — only imported when search mode active
 const SearchResults = lazy(() => import("@/components/dashboard/SearchResults"));
 
+import { SkeletonCard } from "@/components/ui/SkeletonCard";
+
 // [rendering-hoist-jsx] Skeleton fallback hoisted to module level
 const SearchSkeleton = () => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
     {[0, 1, 2, 3, 4, 5].map((i) => (
-      <div key={i} className="rounded-xl border border-border/50 bg-card/60 p-4 space-y-3">
-        <div className="flex items-start gap-3">
-          <Skeleton className="w-10 h-10 rounded-lg" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-3 w-full" />
-          </div>
-        </div>
-        <div className="flex items-center justify-between pt-2 border-t border-border/30">
-          <Skeleton className="h-5 w-20 rounded-full" />
-          <Skeleton className="h-3 w-16" />
-        </div>
-      </div>
+      <SkeletonCard key={i} />
     ))}
   </div>
 );
@@ -103,10 +93,7 @@ const Dashboard = () => {
         </div>
 
         {authLoading || isLoading ? (
-          <div className="text-center py-16 animate-in fade-in duration-500">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">{authLoading ? 'Đang khởi tạo...' : 'Đang tải notebooks...'}</p>
-          </div>
+          <SkeletonScreen />
         ) : authError || (isError && error) ? (
           <div className="text-center py-16 animate-in slide-in-from-bottom-4 fade-in">
             <p className="text-destructive mb-4">Lỗi: {authError || error}</p>

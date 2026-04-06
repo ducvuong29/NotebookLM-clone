@@ -34,9 +34,7 @@ const CopiedTextDialog = ({
             setTitle(words.length > 50 ? words.substring(0, 50) + '...' : words);
           }
         })
-        .catch(err => {
-          console.log('Could not read clipboard:', err);
-        });
+        .catch(() => undefined);
     }
   }, [open]);
 

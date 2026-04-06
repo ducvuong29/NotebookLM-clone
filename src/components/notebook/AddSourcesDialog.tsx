@@ -280,8 +280,6 @@ const AddSourcesDialog = ({
     setIsLocallyProcessing(true);
 
     try {
-      console.log('Creating sources for multiple websites with delay strategy:', urls.length);
-      
       // Create the first source immediately (this will trigger generation if it's the first source)
       const firstSource = await addSourceAsync({
         notebookId,
@@ -294,14 +292,11 @@ const AddSourcesDialog = ({
           webhookProcessed: true
         }
       });
-      
-      console.log('First source created:', firstSource.id);
-      
+
       let remainingSources = [];
       
       // If there are more URLs, add a delay before creating the rest
       if (urls.length > 1) {
-        console.log('Adding 150ms delay before creating remaining sources...');
         await new Promise(resolve => setTimeout(resolve, 150));
         
         // Create remaining sources
@@ -318,8 +313,6 @@ const AddSourcesDialog = ({
             }
           });
         }));
-        
-        console.log('Remaining sources created:', remainingSources.length);
       }
 
       // Combine all created sources

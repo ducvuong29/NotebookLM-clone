@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, Upload, FileText, Loader2, RefreshCw, AlertCircle, RotateCcw } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { useChatMessages } from '@/hooks/useChatMessages';
@@ -12,6 +10,9 @@ import MarkdownRenderer from '@/components/chat/MarkdownRenderer';
 import SaveToNoteButton from './SaveToNoteButton';
 import AddSourcesDialog from './AddSourcesDialog';
 import { Citation } from '@/types/message';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonChatMessage } from '@/components/ui/SkeletonChatMessage';
+import { EMPTY_STATE } from '@/lib/empty-state-content';
 
 interface ChatAreaProps {
   hasSource: boolean;
@@ -44,7 +45,6 @@ const ChatArea = ({
   const [showTimeout, setShowTimeout] = useState(false);
   const lastFailedMessageRef = useRef<string | null>(null);
   const handleSendMessageRef = useRef<(msg?: string) => void>(() => {});
-  const { toast } = useToast();
   
   const isGenerating = notebook?.generation_status === 'generating';
   
@@ -227,12 +227,11 @@ const ChatArea = ({
                 {/* Chat Messages */}
                 {(messages.length > 0 || pendingUserMessage || showAiLoading) && <div className="mb-6 space-y-4">
                     {messages.map((msg) => {
-                        // [perf] Derive once per message — was calling isUserMessage() 3x and isAiMessage() 1x before
-                        const messageType = msg.message?.type || msg.message?.role;
+                        const messageType = msg.message.type;
                         const isUser = messageType === 'human' || messageType === 'user';
                         const isAi = messageType === 'ai' || messageType === 'assistant';
                         return (
-                          <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+                          <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
                             <div className={`${isUser ? 'max-w-xs lg:max-w-md px-4 py-2 bg-blue-500 text-white rounded-lg' : 'w-full'}`}>
                               <div className={isUser ? '' : 'prose prose-gray dark:prose-invert max-w-none text-foreground'}>
                                 <MarkdownRenderer content={msg.message.content} className={isUser ? '' : ''} onCitationClick={handleCitationClick} selectedCitation={selectedCitation} isUserMessage={isUser} />
@@ -254,12 +253,8 @@ const ChatArea = ({
                     
                     {/* AI Loading Indicator */}
                     {showAiLoading && <div className="flex justify-start" ref={latestMessageRef}>
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-2 px-4 py-3 bg-muted rounded-lg">
-                            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                          </div>
+                        <div className="space-y-2 w-full">
+                          <SkeletonChatMessage />
                           {showTimeout && (
                             <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
                               <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -328,15 +323,17 @@ const ChatArea = ({
         </div> :
     // Empty State
     <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-hidden">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-muted">
-              <Upload className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h2 className="text-xl font-medium text-foreground mb-4">Thêm nguồn để bắt đầu</h2>
-            <Button onClick={() => setShowAddSourcesDialog(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Tải nguồn lên
-            </Button>
+          <div className="mb-8 w-full max-w-md mx-auto">
+            <EmptyState
+              icon={<Upload className="h-10 w-10 text-muted-foreground opacity-50" />}
+              title="Thêm nguồn để bắt đầu"
+              description="Tải lên tài liệu để AI có thể hỗ trợ bạn kết nối các ý tưởng và giải đáp câu hỏi."
+              action={{
+                label: 'Tải nguồn lên',
+                onClick: () => setShowAddSourcesDialog(true),
+                icon: <Upload className="h-4 w-4" />
+              }}
+            />
           </div>
 
           {/* Bottom Input */}

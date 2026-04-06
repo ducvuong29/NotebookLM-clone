@@ -3,6 +3,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
+
+type NotebookRow = Database['public']['Tables']['notebooks']['Row'];
 
 export const useAudioOverview = (notebookId?: string) => {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -32,8 +35,7 @@ export const useAudioOverview = (notebookId?: string) => {
           filter: `id=eq.${notebookId}`
         },
         (payload) => {
-          console.log('Notebook updated:', payload);
-          const newData = payload.new as any /* eslint-disable-line @typescript-eslint/no-explicit-any */;
+          const newData = payload.new as NotebookRow;
           
           if (newData.audio_overview_generation_status) {
             setGenerationStatus(newData.audio_overview_generation_status);
@@ -81,9 +83,7 @@ export const useAudioOverview = (notebookId?: string) => {
 
       return data;
     },
-    onSuccess: (data, notebookId) => {
-      console.log('Audio generation started successfully:', data);
-    },
+    onSuccess: () => undefined,
     onError: (error) => {
       console.error('Audio generation failed to start:', error);
       setIsGenerating(false);
@@ -114,8 +114,7 @@ export const useAudioOverview = (notebookId?: string) => {
 
       return data;
     },
-    onSuccess: (data, variables) => {
-      console.log('Audio URL refreshed successfully:', data);
+    onSuccess: (_, variables) => {
       // Invalidate queries to refresh the UI with new URL
       queryClient.invalidateQueries({ queryKey: ['notebooks'] });
       
@@ -143,7 +142,6 @@ export const useAudioOverview = (notebookId?: string) => {
 
   const autoRefreshIfExpired = async (notebookId: string, expiresAt: string | null) => {
     if (checkAudioExpiry(expiresAt) && !isAutoRefreshing && !refreshAudioUrl.isPending) {
-      console.log('Audio URL expired, auto-refreshing...');
       try {
         await refreshAudioUrl.mutateAsync({ notebookId, silent: true });
       } catch (error) {

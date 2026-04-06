@@ -12,7 +12,12 @@ import SourceContentViewer from '@/components/chat/SourceContentViewer';
 import { useSources } from '@/hooks/useSources';
 import { useSourceDelete } from '@/hooks/useSourceDelete';
 import { Citation } from '@/types/message';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonSourceItem } from '@/components/ui/SkeletonSourceItem';
+import { EMPTY_STATE } from '@/lib/empty-state-content';
+import type { Database } from '@/integrations/supabase/types';
 
+type SourceRecord = Database['public']['Tables']['sources']['Row'];
 
 interface SourcesSidebarProps {
   hasSource: boolean;
@@ -36,10 +41,8 @@ const SourcesSidebar = ({
   const [showAddSourcesDialog, setShowAddSourcesDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [selectedSource, setSelectedSource] = useState<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [selectedSourceForViewing, setSelectedSourceForViewing] = useState<any>(null);
+  const [selectedSource, setSelectedSource] = useState<SourceRecord | null>(null);
+  const [selectedSourceForViewing, setSelectedSourceForViewing] = useState<SourceRecord | null>(null);
 
   const {
     sources,
@@ -120,17 +123,17 @@ const SourcesSidebar = ({
     }
   };
 
-  const handleRemoveSource = (source: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
+  const handleRemoveSource = (source: SourceRecord) => {
     setSelectedSource(source);
     setShowDeleteDialog(true);
   };
 
-  const handleRenameSource = (source: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
+  const handleRenameSource = (source: SourceRecord) => {
     setSelectedSource(source);
     setShowRenameDialog(true);
   };
 
-  const handleSourceClick = (source: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) => {
+  const handleSourceClick = (source: SourceRecord) => {
     // Clear any existing citation state first
     if (setSelectedCitation) {
       setSelectedCitation(null);
@@ -225,15 +228,17 @@ const SourcesSidebar = ({
       <ScrollArea className="flex-1 h-full">
         <div className="p-4">
           {isLoading ? (
-            <div className="text-center py-8">
-              <p className="text-sm text-gray-600">Loading sources...</p>
+            <div className="space-y-4">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <SkeletonSourceItem key={i} />
+              ))}
             </div>
           ) : sources && sources.length > 0 ? (
             <div className="space-y-4">
               {sources.map((source) => (
                 <ContextMenu key={source.id}>
                   <ContextMenuTrigger>
-                    <Card className="p-3 border border-border cursor-pointer hover:bg-muted" onClick={() => handleSourceClick(source)}>
+                    <Card className="p-3 border border-border cursor-pointer hover:bg-muted animate-fade-in" onClick={() => handleSourceClick(source)}>
                       <div className="flex items-start justify-between space-x-3">
                         <div className="flex items-center space-x-2 flex-1 min-w-0">
                           <div className="w-6 h-6 bg-background rounded border border-border flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -272,13 +277,12 @@ const SourcesSidebar = ({
               ))}
             </div>
           ) : (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 bg-muted rounded-lg mx-auto mb-4 flex items-center justify-center">
-                <span className="text-muted-foreground text-2xl">📄</span>
-              </div>
-              <h3 className="text-lg font-medium text-foreground mb-2">Nguồn đã lưu sẽ xuất hiện ở đây</h3>
-              <p className="text-sm text-muted-foreground mb-4">Nhấn Thêm nguồn ở trên để thêm PDF, văn bản hoặc file âm thanh.</p>
-            </div>
+            <EmptyState
+              icon={<span className="text-4xl block mb-2">📄</span>}
+              title={EMPTY_STATE.sources.title}
+              description={EMPTY_STATE.sources.description}
+              className="py-12"
+            />
           )}
         </div>
       </ScrollArea>
