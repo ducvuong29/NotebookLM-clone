@@ -20,8 +20,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', "Inter", ...defaultTheme.fontFamily.sans],
-        heading: ['"Playfair Display"', "Georgia", "serif"],
+        sans: ['"Inter Variable"', "Inter", ...defaultTheme.fontFamily.sans],
+        heading: ['"Inter Variable"', "Inter", ...defaultTheme.fontFamily.sans],
         mono: ["JetBrains Mono", ...defaultTheme.fontFamily.mono],
       },
       colors: {
@@ -70,19 +70,10 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
 
-        /* InsightsLM Material semantic tokens */
-        "im-primary": "var(--im-primary)",
-        "im-primary-hover": "var(--im-primary-hover)",
-        "im-primary-light": "var(--im-primary-light)",
-        "im-surface": "var(--im-surface)",
-        "im-card-hover": "var(--im-card-hover)",
-        "im-text-primary": "var(--im-text-primary)",
-        "im-text-secondary": "var(--im-text-secondary)",
-        "im-text-muted": "var(--im-text-muted)",
-        "im-success": "var(--im-success)",
-        "im-warning": "var(--im-warning)",
-        "im-error": "var(--im-error)",
-        "im-info": "var(--im-info)",
+        success: { DEFAULT: "hsl(var(--success))", foreground: "hsl(var(--success-foreground))" },
+        warning: { DEFAULT: "hsl(var(--warning))", foreground: "hsl(var(--warning-foreground))" },
+        error: { DEFAULT: "hsl(var(--error))", foreground: "hsl(var(--error-foreground))" },
+        info: { DEFAULT: "hsl(var(--info))", foreground: "hsl(var(--info-foreground))" },
 
         /* Department palette */
         "dept-1": {
@@ -127,22 +118,27 @@ export default {
         },
       },
       spacing: {
-        "space-xs": "var(--space-xs)",
-        "space-sm": "var(--space-sm)",
-        "space-md": "var(--space-md)",
-        "space-lg": "var(--space-lg)",
-        "space-xl": "var(--space-xl)",
-        "space-2xl": "var(--space-2xl)",
+        "0.5": "var(--space-0-5)",
+        "1": "var(--space-1)",
+        "2": "var(--space-2)",
+        "3": "var(--space-3)",
+        "4": "var(--space-4)",
+        "6": "var(--space-6)",
+        "8": "var(--space-8)",
+        "12": "var(--space-12)",
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "var(--radius-lg)",
+        md: "var(--radius-md)",
+        sm: "var(--radius-sm)",
+        DEFAULT: "var(--radius)",
+        full: "var(--radius-full)",
       },
       boxShadow: {
-        "elevation-sm": "var(--shadow-sm)",
-        "elevation-md": "var(--shadow-md)",
-        "elevation-lg": "var(--shadow-lg)",
+        none: "var(--shadow-none)",
+        sm: "var(--shadow-sm)",
+        md: "var(--shadow-md)",
+        lg: "var(--shadow-lg)",
       },
       keyframes: {
         "accordion-down": {
