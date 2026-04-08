@@ -26,22 +26,32 @@ serve(async (req) => {
     );
 
     // 3. Permission check + source fetch (PARALLEL)
-    const [memberResult, ownerResult, sourceResult] = await Promise.all([
+    const [memberResult, notebookResult, sourceResult] = await Promise.all([
       supabaseAdmin.from('notebook_members')
         .select('role').eq('notebook_id', notebook_id).eq('user_id', user!.id).maybeSingle(),
       supabaseAdmin.from('notebooks')
-        .select('id').eq('id', notebook_id).eq('user_id', user!.id).maybeSingle(),
+        .select('id, user_id, visibility').eq('id', notebook_id).maybeSingle(),
       supabaseAdmin.from('sources')
         .select('content, title, processing_status')
         .eq('id', source_id).eq('notebook_id', notebook_id).single(),
     ]);
 
-    // 4. Verify permission — any notebook role allowed
-    const isOwner = !!ownerResult.data;
-    const isMember = !!memberResult.data;
-    if (!isOwner && !isMember) {
+    // 4. Verify permission — owner, member, or public notebook allowed
+    const notebook = notebookResult.data;
+    if (!notebook) {
       return new Response(
-        JSON.stringify({ error: 'Forbidden - not a member of this notebook' }),
+        JSON.stringify({ error: 'Notebook not found' }),
+        { status: 404, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const isOwner = notebook.user_id === user!.id;
+    const isMember = !!memberResult.data;
+    const isPublic = notebook.visibility === 'public';
+    
+    if (!isOwner && !isMember && !isPublic) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden - not a member of this notebook and notebook is not public' }),
         { status: 403, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       );
     }
