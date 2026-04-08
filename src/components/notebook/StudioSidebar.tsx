@@ -239,7 +239,7 @@ const StudioSidebar = ({
 
   return <div className="w-full bg-muted/30 border-l border-border flex flex-col h-full overflow-hidden">
       <div className="p-4 border-b border-border flex-shrink-0">
-        <h2 className="text-lg font-medium text-foreground mb-4">Studio</h2>
+        <h2 className="text-lg font-medium text-foreground mb-4 md:ml-10">Studio</h2>
         
         {/* Audio Overview */}
         <Card className="p-4 mb-4 border border-border">

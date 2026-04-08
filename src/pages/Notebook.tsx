@@ -1,10 +1,19 @@
-
-import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { lazy, Suspense, useEffect, useState, useCallback, useMemo } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
+import { RegenerateFlowchartDialog } from '@/components/flowchart/RegenerateFlowchartDialog';
+import { UnsavedChangesDialog } from '@/components/flowchart/UnsavedChangesDialog';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, GripVertical } from 'lucide-react';
+import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import { useNotebooks } from '@/hooks/useNotebooks';
 import { useSources } from '@/hooks/useSources';
 import { useIsDesktop } from '@/hooks/useIsDesktop';
 import { useNotebookPermissions } from '@/hooks/useNotebookPermissions';
+import { FlowchartSkeleton } from '@/components/flowchart/FlowchartSkeleton';
+import { useFlowcharts } from '@/hooks/useFlowcharts';
+import { useGenerateFlowchart } from '@/hooks/useGenerateFlowchart';
 import NotebookHeader from '@/components/notebook/NotebookHeader';
 import SourcesSidebar from '@/components/notebook/SourcesSidebar';
 import ChatArea from '@/components/notebook/ChatArea';
@@ -13,120 +22,458 @@ import MobileNotebookTabs from '@/components/notebook/MobileNotebookTabs';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { Citation } from '@/types/message';
 
+const FlowchartPanel = lazy(() =>
+  import('@/components/flowchart/FlowchartPanel').then((module) => ({
+    default: module.FlowchartPanel,
+  }))
+);
+
+interface SidebarDockButtonProps {
+  side: 'left' | 'right';
+  action: 'open' | 'close';
+  onClick: () => void;
+}
+
+const SidebarDockButton = ({ side, action, onClick }: SidebarDockButtonProps) => {
+  const edgeClass =
+    side === 'left'
+      ? action === 'open'
+        ? 'left-3'
+        : 'right-3'
+      : action === 'open'
+        ? 'right-3'
+        : 'left-3';
+
+  const icon =
+    side === 'left'
+      ? action === 'open'
+        ? <PanelLeftOpen className="h-4 w-4" />
+        : <PanelLeftClose className="h-4 w-4" />
+      : action === 'open'
+        ? <PanelRightOpen className="h-4 w-4" />
+        : <PanelRightClose className="h-4 w-4" />;
+
+  const ariaLabel =
+    side === 'left'
+      ? action === 'open'
+        ? 'Hiện nguồn'
+        : 'Ẩn nguồn'
+      : action === 'open'
+        ? 'Hiện sidebar phải'
+        : 'Ẩn sidebar phải';
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className={`absolute top-3 z-20 hidden h-9 w-9 rounded-xl border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground md:inline-flex ${edgeClass}`}
+    >
+      {icon}
+    </Button>
+  );
+};
+
 const Notebook = () => {
   const { id: notebookId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const fromSearch = (location.state as { fromSearch?: string })?.fromSearch;
   const { notebooks } = useNotebooks();
   const { sources } = useSources(notebookId);
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
   const [activeTab, setActiveTab] = useState<string>('chat');
+  const [showSourcesSidebar, setShowSourcesSidebar] = useState(true);
+  const [showRightSidebar, setShowRightSidebar] = useState(true);
+  const [showFlowchart, setShowFlowchart] = useState(false);
+  const [hasLoadedFlowchart, setHasLoadedFlowchart] = useState(false);
+  const { flowcharts, getFlowchartBySourceId, saveFlowchart } = useFlowcharts(notebookId);
+  const { generateFlowchartAsync, isGenerating: isFlowchartGenerating } = useGenerateFlowchart(notebookId);
+  const [activeFlowchartSourceId, setActiveFlowchartSourceId] = useState<string | null>(null);
+  const [pendingRegenerateSourceId, setPendingRegenerateSourceId] = useState<string | null>(null);
+  const [isFlowchartDirty, setIsFlowchartDirty] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const { toast } = useToast();
+
+  const guardedAction = useCallback((action: () => void) => {
+    if (isFlowchartDirty) {
+      setPendingAction(() => action);
+      setShowUnsavedDialog(true);
+    } else {
+      action();
+    }
+  }, [isFlowchartDirty]);
+
+  const flowchartGeneratingStatus = useMemo(() => {
+    const map = new Map<string, string>();
+    flowcharts?.forEach(fc => {
+      if (fc.generation_status === 'generating') {
+        map.set(fc.source_id, 'generating');
+      }
+    });
+    return map;
+  }, [flowcharts]);
   const isDesktop = useIsDesktop();
 
-  const notebook = notebooks?.find(n => n.id === notebookId);
-  const hasSource = sources && sources.length > 0;
-  const isSourceDocumentOpen = !!selectedCitation;
+  const notebook = notebooks?.find((item) => item.id === notebookId);
+  const hasSource = Boolean(sources && sources.length > 0);
+  const isSourceDocumentOpen = Boolean(selectedCitation);
 
-  // C-2 + H-3 fix: Centralize permission derivation — call once, pass down as props
-  // This avoids 3 separate useNotebookPermissions calls in child components
-  // TanStack Query dedup handles the underlying useNotebookMembers call, 
-  // but centralizing avoids extra subscription overhead
-  const {
-    role,
-    canEdit,
-    canDelete,
-    canInvite,
-    canChat,
-    isMember,
-    isOwner,
-    isLoading: permissionsLoading,
-  } = useNotebookPermissions(notebookId, notebook?.user_id, notebook?.visibility);
+  useEffect(() => {
+    if (selectedCitation?.source_id) {
+      guardedAction(() => {
+        setActiveFlowchartSourceId(selectedCitation.source_id);
+      });
+    }
+  }, [selectedCitation?.source_id, guardedAction]);
+
+  useEffect(() => {
+    if (!sources || sources.length === 0) {
+      setShowFlowchart(false);
+      setActiveFlowchartSourceId(null);
+      return;
+    }
+
+    setActiveFlowchartSourceId((currentSourceId) => {
+      if (currentSourceId && sources.some((source) => source.id === currentSourceId)) {
+        return currentSourceId;
+      }
+
+      return sources[0]?.id ?? null;
+    });
+  }, [notebookId, sources]);
+
+  const executeFlowchartGeneration = useCallback(async (sourceId: string) => {
+    const source = sources?.find(s => s.id === sourceId);
+    if (!source) return;
+
+    try {
+      await generateFlowchartAsync({ sourceId, force: !!getFlowchartBySourceId(sourceId) });
+
+      // Switch to flowchart panel immediately (data arrives via Realtime)
+      guardedAction(() => {
+        setActiveFlowchartSourceId(sourceId);
+        setShowFlowchart(true);
+        setHasLoadedFlowchart(true);
+        setShowRightSidebar(true);
+      });
+    } catch (error) {
+      // Error toast is handled by useGenerateFlowchart.onError
+      console.error('Flowchart generation trigger failed:', error);
+    }
+  }, [sources, generateFlowchartAsync, getFlowchartBySourceId, guardedAction]);
+
+  const handleGenerateFlowchart = useCallback((sourceId: string) => {
+    // Check if flowchart exists → confirmation dialog
+    if (getFlowchartBySourceId(sourceId)) {
+      setPendingRegenerateSourceId(sourceId);
+      return;
+    }
+    executeFlowchartGeneration(sourceId);
+  }, [getFlowchartBySourceId, executeFlowchartGeneration]);
+
+  const { role, canEdit, canDelete, canInvite, isMember } = useNotebookPermissions(
+    notebookId,
+    notebook?.user_id,
+    notebook?.visibility
+  );
 
   const handleCitationClick = (citation: Citation) => {
-    setSelectedCitation(citation);
-    // On mobile, auto-switch to Sources tab so the user sees the source content
-    if (!isDesktop) {
-      setActiveTab('sources');
-    }
+    guardedAction(() => {
+      setActiveFlowchartSourceId(citation.source_id);
+      setSelectedCitation(citation);
+
+      if (!isDesktop) {
+        setActiveTab('sources');
+      }
+    });
   };
 
   const handleCitationClose = () => {
     setSelectedCitation(null);
   };
 
-  // Dynamic width calculations for desktop - expand studio when editing notes
-  const sourcesWidth = isSourceDocumentOpen ? 'w-[35%]' : 'w-[25%]';
-  const studioWidth = 'w-[30%]'; // Expanded width for note editing
-  const chatWidth = isSourceDocumentOpen ? 'w-[35%]' : 'w-[45%]';
+  const handleFlowchartToggle = () => {
+    guardedAction(() => {
+      if (!showFlowchart) {
+        setHasLoadedFlowchart(true);
+        setActiveFlowchartSourceId(
+          selectedCitation?.source_id ?? activeFlowchartSourceId ?? sources?.[0]?.id ?? null
+        );
+      }
+
+      setShowRightSidebar(true);
+      setShowFlowchart((currentValue) => !currentValue);
+    });
+  };
+
+  const handleNavigateHome = useCallback(() => {
+    guardedAction(() => {
+      navigate('/');
+    });
+  }, [guardedAction, navigate]);
+
+  const handleNavigateBack = useCallback(() => {
+    guardedAction(() => {
+      if (fromSearch) {
+        navigate(`/?q=${encodeURIComponent(fromSearch)}`);
+      } else {
+        navigate(-1);
+      }
+    });
+  }, [guardedAction, navigate, fromSearch]);
+
+  const handleFlowchartSave = useCallback(async (draft: {
+    mermaid_code: string;
+    title: string;
+    summary: string;
+  }) => {
+    if (!activeFlowchartSourceId) return;
+    const existing = getFlowchartBySourceId(activeFlowchartSourceId);
+    if (!existing) return;
+
+    try {
+      await saveFlowchart.mutateAsync({
+        id: existing.id,
+        mermaid_code: draft.mermaid_code,
+        title: draft.title,
+        summary: draft.summary,
+      });
+      toast({ title: "Đã lưu sơ đồ!", variant: "default" });
+    } catch {
+      toast({
+        title: "Lỗi lưu sơ đồ",
+        description: "Không thể lưu thay đổi. Vui lòng thử lại.",
+        variant: "destructive",
+      });
+    }
+  }, [activeFlowchartSourceId, getFlowchartBySourceId, saveFlowchart, toast]);
+
+  const activeFlowchartSource =
+    sources?.find((source) => source.id === activeFlowchartSourceId) ?? null;
+  const activeFlowchartData = activeFlowchartSourceId
+    ? getFlowchartBySourceId(activeFlowchartSourceId) ?? null
+    : null;
+
+  useEffect(() => {
+    if (!isFlowchartDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = ''; // Required for generic message to appear
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isFlowchartDirty]);
+
+  const sourcesWidth = showSourcesSidebar
+    ? isSourceDocumentOpen
+      ? 'w-[26%]'
+      : 'w-[18%]'
+    : 'w-0';
+
+  const rightSidebarWidth = showRightSidebar
+    ? showFlowchart
+      ? showSourcesSidebar
+        ? 'w-[34%]'
+        : 'w-[40%]'
+      : showSourcesSidebar
+        ? 'w-[30%]'
+        : 'w-[34%]'
+    : 'w-0';
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
-      <NotebookHeader 
-        title={notebook?.title || 'Notebook chưa đặt tên'} 
-        notebookId={notebookId} 
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
+      <NotebookHeader
+        title={notebook?.title || 'Notebook chưa đặt tên'}
+        notebookId={notebookId}
         notebookOwnerId={notebook?.user_id}
         role={role}
         canEdit={canEdit}
         canInvite={canInvite}
         isMember={isMember}
+        showFlowchartToggle={Boolean(isDesktop && hasSource)}
+        isFlowchartActive={showFlowchart}
+        onToggleFlowchart={handleFlowchartToggle}
+        onNavigateHome={handleNavigateHome}
+        onNavigateBack={handleNavigateBack}
       />
-      
+
       {isDesktop ? (
-        // Desktop layout (3-column)
-        <main id="main-content" className="flex-1 flex overflow-hidden">
-          <div className={`${sourcesWidth} flex-shrink-0`}>
-            <SourcesSidebar 
-              hasSource={hasSource || false} 
+        <main id="main-content" className="flex flex-1 overflow-hidden">
+          <PanelGroup direction="horizontal">
+            {showSourcesSidebar && (
+              <>
+                <Panel
+                  id="sources-panel"
+                  order={1}
+                  collapsible
+                  defaultSize={20}
+                  minSize={15}
+                  maxSize={40}
+                  className="relative"
+                >
+                  <div className="h-full overflow-hidden opacity-100">
+                      <SourcesSidebar
+                        hasSource={hasSource}
+                        notebookId={notebookId}
+                        selectedCitation={selectedCitation}
+                        onCitationClose={handleCitationClose}
+                        setSelectedCitation={setSelectedCitation}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        onGenerateFlowchart={handleGenerateFlowchart}
+                        flowchartStatusMap={flowchartGeneratingStatus}
+                        onCloseSidebar={() => setShowSourcesSidebar(false)}
+                      />
+                  </div>
+                </Panel>
+                <PanelResizeHandle className="relative flex w-2 items-center justify-center bg-border/40 hover:bg-primary/50 transition-colors z-10 cursor-col-resize group">
+                  <div className="z-20 flex h-6 w-3 items-center justify-center rounded-sm border border-border bg-background shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                    <GripVertical className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                </PanelResizeHandle>
+              </>
+            )}
+
+            <Panel id="chat-panel" order={2} className="relative min-w-0">
+              {!showSourcesSidebar && (
+                <SidebarDockButton
+                  side="left"
+                  action="open"
+                  onClick={() => setShowSourcesSidebar(true)}
+                />
+              )}
+              {!showRightSidebar && (
+                <SidebarDockButton
+                  side="right"
+                  action="open"
+                  onClick={() => setShowRightSidebar(true)}
+                />
+              )}
+              <ErrorBoundary key={notebookId}>
+                <ChatArea
+                  hasSource={hasSource}
+                  notebookId={notebookId}
+                  notebook={notebook}
+                  onCitationClick={handleCitationClick}
+                  selectedCitation={selectedCitation}
+                />
+              </ErrorBoundary>
+            </Panel>
+
+            {showRightSidebar && (
+              <>
+                <PanelResizeHandle className="relative flex w-2 items-center justify-center bg-border/40 hover:bg-primary/50 transition-colors z-10 cursor-col-resize group">
+                  <div className="z-20 flex h-6 w-3 items-center justify-center rounded-sm border border-border bg-background shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                    <GripVertical className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                </PanelResizeHandle>
+                <Panel
+                  id="studio-panel"
+                  order={3}
+                  collapsible
+                  defaultSize={30}
+                  minSize={25}
+                  maxSize={50}
+                  className="relative"
+                >
+                  <div className="relative h-full overflow-hidden opacity-100">
+                    <div
+                      aria-hidden={showFlowchart}
+                      className={`absolute inset-0 transition-panel ${
+                        showFlowchart
+                          ? 'translate-x-full opacity-0 pointer-events-none'
+                          : 'translate-x-0 opacity-100'
+                      }`}
+                    >
+                      <StudioSidebar
+                        notebookId={notebookId}
+                        onCitationClick={handleCitationClick}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        isMember={isMember}
+                      />
+                    </div>
+
+                    <div
+                      aria-hidden={!showFlowchart}
+                      className={`absolute inset-0 transition-panel ${
+                        showFlowchart
+                          ? 'translate-x-0 opacity-100'
+                          : 'translate-x-full opacity-0 pointer-events-none'
+                      }`}
+                    >
+                      {hasLoadedFlowchart ? (
+                        <Suspense fallback={<FlowchartSkeleton />}>
+                          <FlowchartPanel
+                            flowchartData={activeFlowchartData}
+                            sourceName={activeFlowchartSource?.title}
+                            onSave={handleFlowchartSave}
+                            onClose={() => guardedAction(() => setShowFlowchart(false))}
+                            onOpenSources={() => guardedAction(() => setShowSourcesSidebar(true))}
+                            onDirtyStateChange={setIsFlowchartDirty}
+                          />
+                        </Suspense>
+                      ) : null}
+                    </div>
+                  </div>
+                  <SidebarDockButton
+                    side="right"
+                    action="close"
+                    onClick={() => setShowRightSidebar(false)}
+                  />
+                </Panel>
+              </>
+            )}
+          </PanelGroup>
+        </main>
+      ) : (
+        <main id="main-content" className="h-full flex-1 overflow-hidden">
+          <ErrorBoundary key={notebookId}>
+            <MobileNotebookTabs
+              hasSource={hasSource}
               notebookId={notebookId}
+              notebook={notebook}
               selectedCitation={selectedCitation}
               onCitationClose={handleCitationClose}
               setSelectedCitation={setSelectedCitation}
-              canEdit={canEdit}
-              canDelete={canDelete}
-            />
-          </div>
-          
-          <div className={`${chatWidth} flex-shrink-0`}>
-            <ErrorBoundary key={notebookId}>
-              <ChatArea 
-                hasSource={hasSource || false} 
-                notebookId={notebookId}
-                notebook={notebook}
-                onCitationClick={handleCitationClick}
-                selectedCitation={selectedCitation}
-              />
-            </ErrorBoundary>
-          </div>
-          
-          <div className={`${studioWidth} flex-shrink-0`}>
-            <StudioSidebar 
-              notebookId={notebookId} 
               onCitationClick={handleCitationClick}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
               canEdit={canEdit}
               canDelete={canDelete}
               isMember={isMember}
             />
-          </div>
-        </main>
-      ) : (
-        // Mobile/Tablet layout (tabs)
-        <main id="main-content" className="flex-1 overflow-hidden h-full">
-          <ErrorBoundary key={notebookId}>
-            <MobileNotebookTabs
-            hasSource={hasSource || false}
-            notebookId={notebookId}
-            notebook={notebook}
-            selectedCitation={selectedCitation}
-            onCitationClose={handleCitationClose}
-            setSelectedCitation={setSelectedCitation}
-            onCitationClick={handleCitationClick}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            canEdit={canEdit}
-            canDelete={canDelete}
-            isMember={isMember}
-          />
           </ErrorBoundary>
         </main>
       )}
+
+      <RegenerateFlowchartDialog
+        open={!!pendingRegenerateSourceId}
+        onOpenChange={(open) => {
+          if (!open) setPendingRegenerateSourceId(null);
+        }}
+        onConfirm={() => {
+          if (pendingRegenerateSourceId) {
+            executeFlowchartGeneration(pendingRegenerateSourceId);
+            setPendingRegenerateSourceId(null);
+          }
+        }}
+        sourceName={sources?.find(s => s.id === pendingRegenerateSourceId)?.title ?? ''}
+      />
+
+      <UnsavedChangesDialog
+        open={showUnsavedDialog}
+        onOpenChange={setShowUnsavedDialog}
+        onDiscard={() => {
+          setShowUnsavedDialog(false);
+          pendingAction?.();
+          setPendingAction(null);
+        }}
+      />
     </div>
   );
 };

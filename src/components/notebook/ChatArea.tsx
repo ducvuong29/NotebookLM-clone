@@ -192,7 +192,7 @@ const ChatArea = ({
       {hasSource ? <div className="flex-1 flex flex-col h-full overflow-hidden">
           {/* Chat Header */}
           <div className="p-4 border-b border-border flex-shrink-0">
-            <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <div className="max-w-[1000px] mx-auto flex items-center justify-between">
               <h2 className="text-lg font-medium text-foreground">Trò chuyện</h2>
               {shouldShowRefreshButton && <Button variant="ghost" size="sm" onClick={handleRefreshChat} disabled={isDeletingChatHistory || isChatDisabled} className="flex items-center space-x-2">
                   <RefreshCw className={`h-4 w-4 ${isDeletingChatHistory ? 'animate-spin' : ''}`} />
@@ -204,7 +204,7 @@ const ChatArea = ({
           <ScrollArea className="flex-1 h-full" ref={scrollAreaRef}>
             {/* Document Summary */}
             <div className="p-8 border-b border-border">
-              <div className="max-w-4xl mx-auto">
+              <div className="max-w-[1000px] mx-auto">
                 <div className="flex items-center space-x-4 mb-6">
                   <div className="w-10 h-10 flex items-center justify-center bg-transparent">
                     {isGenerating ? <Loader2 className="text-foreground font-normal w-10 h-10 animate-spin" /> : <span className="text-[40px] leading-none">{notebook?.icon || '☕'}</span>}
@@ -232,7 +232,7 @@ const ChatArea = ({
                         const isAi = messageType === 'ai' || messageType === 'assistant';
                         return (
                           <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-                            <div className={`${isUser ? 'max-w-xs lg:max-w-md px-4 py-2 bg-blue-500 text-white rounded-lg' : 'w-full'}`}>
+                            <div className={`${isUser ? 'max-w-md lg:max-w-2xl px-4 py-2 bg-blue-500 text-white rounded-lg' : 'w-full'}`}>
                               <div className={isUser ? '' : 'prose prose-gray dark:prose-invert max-w-none text-foreground'}>
                                 <MarkdownRenderer content={msg.message.content} className={isUser ? '' : ''} onCitationClick={handleCitationClick} selectedCitation={selectedCitation} isUserMessage={isUser} />
                               </div>
@@ -246,7 +246,7 @@ const ChatArea = ({
                     
                     {/* Pending user message */}
                     {pendingUserMessage && <div className="flex justify-end">
-                        <div className="max-w-xs lg:max-w-md px-4 py-2 bg-blue-500 text-white rounded-lg">
+                        <div className="max-w-md lg:max-w-2xl px-4 py-2 bg-blue-500 text-white rounded-lg">
                           <MarkdownRenderer content={pendingUserMessage} className="" isUserMessage={true} />
                         </div>
                       </div>}
@@ -289,7 +289,7 @@ const ChatArea = ({
 
           {/* Chat Input - Fixed at bottom */}
           <div className="p-6 border-t border-border flex-shrink-0">
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-[1000px] mx-auto">
               <div className="flex space-x-4">
                 <div className="flex-1 relative">
                   <Input placeholder={getPlaceholderText()} value={message} onChange={e => setMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && !isChatDisabled && !isSending && !pendingUserMessage && handleSendMessage()} className="pr-12" disabled={isChatDisabled || isSending || !!pendingUserMessage} />
@@ -304,7 +304,7 @@ const ChatArea = ({
               
               {/* Example Questions Carousel */}
               {!isChatDisabled && !pendingUserMessage && !showAiLoading && exampleQuestions.length > 0 && <div className="mt-4">
-                  <Carousel className="w-full max-w-4xl">
+                  <Carousel className="w-full max-w-[1000px]">
                     <CarouselContent className="-ml-2 md:-ml-4">
                       {exampleQuestions.map((question, index) => <CarouselItem key={index} className="pl-2 md:pl-4 basis-auto">
                           <Button variant="outline" size="sm" className="text-left whitespace-nowrap h-auto py-2 px-3 text-sm" onClick={() => handleExampleQuestionClick(question)}>

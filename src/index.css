@@ -260,6 +260,90 @@
   animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
 
+.flowchart-canvas {
+  background-image: radial-gradient(circle, hsl(var(--border)) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.flowchart-mermaid {
+  content-visibility: auto;
+}
+
+.flowchart-mermaid svg {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+.flowchart-mermaid svg:active {
+  cursor: grabbing;
+}
+
+.flowchart-mermaid svg text,
+.flowchart-mermaid svg .label {
+  fill: hsl(var(--foreground));
+  font-family: var(--font-sans);
+}
+
+.flowchart-mermaid svg .node rect,
+.flowchart-mermaid svg .node path,
+.flowchart-mermaid svg .node circle,
+.flowchart-mermaid svg .node ellipse {
+  fill: hsl(var(--card));
+  stroke: hsl(var(--border));
+}
+
+.flowchart-mermaid svg .node polygon {
+  fill: hsl(var(--warning) / 0.1);
+  stroke: hsl(var(--warning));
+}
+
+.flowchart-mermaid svg g[id*="start"] rect,
+.flowchart-mermaid svg g[id*="start"] path,
+.flowchart-mermaid svg g[id*="start"] circle,
+.flowchart-mermaid svg g[id*="start"] ellipse {
+  fill: hsl(var(--success) / 0.2);
+  stroke: hsl(var(--success));
+}
+
+.flowchart-mermaid svg g[id*="end"] rect,
+.flowchart-mermaid svg g[id*="end"] path,
+.flowchart-mermaid svg g[id*="end"] circle,
+.flowchart-mermaid svg g[id*="end"] ellipse {
+  fill: hsl(var(--error) / 0.2);
+  stroke: hsl(var(--error));
+}
+
+.flowchart-mermaid svg .edgePath path,
+.flowchart-mermaid svg .flowchart-link {
+  stroke: hsl(var(--muted-foreground));
+}
+
+.flowchart-mermaid svg marker path {
+  fill: hsl(var(--muted-foreground));
+  stroke: hsl(var(--muted-foreground));
+}
+
+/* ===== Export Button Ripple Effect (UX-V2-DR23) ===== */
+.export-btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+.export-btn-ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, hsl(var(--primary) / 0.15) 0%, transparent 70%);
+  transform: scale(0);
+  opacity: 0;
+  transition: transform 300ms ease-out, opacity 300ms ease-out;
+}
+.export-btn-ripple:active::after {
+  transform: scale(2.5);
+  opacity: 1;
+  transition: none;
+}
+
 /* ===== Reduced Motion ===== */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -279,6 +363,10 @@
   .animate-skeleton-pulse {
     animation: none;
     opacity: 0.6;
+  }
+
+  .flowchart-mermaid svg {
+    cursor: default;
   }
 }
 

@@ -25,7 +25,7 @@ interface RenameSourceDialogProps {
 
 const RenameSourceDialog = ({ open, onOpenChange, source, notebookId }: RenameSourceDialogProps) => {
   const [title, setTitle] = useState('');
-  const { updateSource, isUpdating } = useSourceUpdate();
+  const { updateSource, isUpdating } = useSourceUpdate(notebookId);
 
   useEffect(() => {
     if (source && open) {

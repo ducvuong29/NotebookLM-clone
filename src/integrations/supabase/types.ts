@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.4"
   }
   public: {
     Tables: {
@@ -79,16 +59,73 @@ export type Database = {
         Insert: {
           content?: string | null
           embedding?: string | null
-          id?: number
+          id?: never
           metadata?: Json | null
         }
         Update: {
           content?: string | null
           embedding?: string | null
-          id?: number
+          id?: never
           metadata?: Json | null
         }
         Relationships: []
+      }
+      flowcharts: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          generation_status: string
+          id: string
+          mermaid_code: string
+          notebook_id: string
+          source_id: string
+          summary: string | null
+          title: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          generation_status?: string
+          id?: string
+          mermaid_code?: string
+          notebook_id: string
+          source_id: string
+          summary?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          generation_status?: string
+          id?: string
+          mermaid_code?: string
+          notebook_id?: string
+          source_id?: string
+          summary?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flowcharts_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "notebooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flowcharts_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       n8n_chat_histories: {
         Row: {
@@ -298,6 +335,7 @@ export type Database = {
           title: string
           type: Database["public"]["Enums"]["source_type"]
           updated_at: string
+          uploaded_by: string | null
           url: string | null
         }
         Insert: {
@@ -315,6 +353,7 @@ export type Database = {
           title: string
           type: Database["public"]["Enums"]["source_type"]
           updated_at?: string
+          uploaded_by?: string | null
           url?: string | null
         }
         Update: {
@@ -332,6 +371,7 @@ export type Database = {
           title?: string
           type?: Database["public"]["Enums"]["source_type"]
           updated_at?: string
+          uploaded_by?: string | null
           url?: string | null
         }
         Relationships: [
@@ -535,9 +575,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       member_role: ["owner", "editor", "viewer"],

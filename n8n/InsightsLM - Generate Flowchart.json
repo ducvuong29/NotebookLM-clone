@@ -1,0 +1,425 @@
+{
+  "name": "InsightsLM - Generate Flowchart",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-flowchart",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        340
+      ],
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Webhook",
+      "webhookId": "generate-flowchart",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "niNSBpzAl6ge5J0I",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ⚠️ CRITICAL: Webhook data is under .body — NOT directly on .json\n// This is the #1 n8n Code Node mistake. See: n8n-code-javascript skill.\nconst input = $input.first().json.body;\n\nif (!input) {\n  throw new Error('Empty webhook payload — no body received');\n}\n\n// Required fields\nconst { flowchart_id, source_id, notebook_id, source_text, source_title } = input;\n\nif (!flowchart_id || !source_id || !source_text) {\n  throw new Error('Missing required fields: flowchart_id, source_id, source_text');\n}\n\n// Validate UUID format (basic check)\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nif (!uuidRegex.test(flowchart_id)) {\n  throw new Error(`Invalid flowchart_id UUID: ${flowchart_id}`);\n}\n\n// Validate source_text length\nconst MAX_TEXT_LENGTH = 100000; // ~100K chars\nconst truncatedText = source_text.length > MAX_TEXT_LENGTH\n  ? source_text.substring(0, MAX_TEXT_LENGTH) + '\\n\\n[...văn bản đã được cắt ngắn...]'\n  : source_text;\n\n// Return format: MUST be [{json: {...}}] — n8n Code Node requirement\nreturn [{\n  json: {\n    flowchart_id,\n    source_id,\n    notebook_id,\n    source_text: truncatedText,\n    source_title: source_title || 'Untitled',\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -420,
+        340
+      ],
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Validate Input"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.source_text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a document-to-flowchart converter. Analyze the provided text and extract the process flow as a Mermaid.js flowchart diagram.\n\nOutput ONLY valid JSON with this exact structure (no markdown, no code fences):\n{\n  \"title\": \"Tên quy trình (concise, Vietnamese if source is Vietnamese)\",\n  \"summary\": \"Tóm tắt 3-5 câu về quy trình chính trong tài liệu\",\n  \"mermaid_code\": \"flowchart TD\\n    A([Bắt đầu]) --> B[Bước 1]\\n    ...\"\n}\n\nMermaid syntax rules (STRICTLY FOLLOW):\n- ALWAYS start with `flowchart TD` (top-down direction)\n- Node shapes: ([...]) for start/end, [...] for process, {...} for decision, [/...\\] for I/O\n- Use Vietnamese labels when source text is in Vietnamese\n- Maximum 20 nodes per flowchart\n- Every flowchart MUST have exactly 1 start node and at least 1 end node\n- Decision nodes MUST have exactly 2 outgoing edges with labels: -->|Có| and -->|Không| (or equivalent)\n- Use sequential node IDs: A, B, C, D, etc.\n- Do NOT include any HTML tags, JavaScript, or event handlers in labels\n- Use --> for edges (NOT --->, ===>, or other variants)\n- Escape special characters in labels: use #quot; for quotes, #amp; for ampersand\n\nIf the document does NOT contain a clear process or workflow:\n- Return a minimal flowchart with one node\n- Set summary to explain why\n- Set title to \"Không phát hiện quy trình\""
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 4096,
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.6,
+      "position": [
+        -140,
+        340
+      ],
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Generate Flowchart"
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiOutput = $input.first().json;\nconst flowchartId = $('Validate Input').first().json.flowchart_id;\n\n// The OpenAI node returns the response in different fields depending on version\n// Try content field first, then text, then message\nlet rawText = aiOutput.message?.content || aiOutput.text || aiOutput.content || '';\n\n// Strip markdown code fences if AI wrapped them\nrawText = rawText.replace(/^```json?\\s*/i, '').replace(/\\s*```$/i, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(rawText);\n} catch (e) {\n  throw new Error(`AI returned invalid JSON: ${e.message}. Raw: ${rawText.substring(0, 200)}`);\n}\n\n// Validate required fields\nif (!parsed.mermaid_code || typeof parsed.mermaid_code !== 'string') {\n  throw new Error('AI response missing mermaid_code field');\n}\nif (!parsed.title || !parsed.summary) {\n  throw new Error('AI response missing title or summary field');\n}\n\nreturn [{\n  json: {\n    flowchart_id: flowchartId,\n    mermaid_code: parsed.mermaid_code,\n    title: parsed.title,\n    summary: parsed.summary,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        140,
+        340
+      ],
+      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "name": "Parse AI Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { flowchart_id, mermaid_code, title, summary } = $input.first().json;\n\n// 1. Must start with flowchart direction\nif (!/^flowchart\\s+(TD|TB|BT|RL|LR)/i.test(mermaid_code.trim())) {\n  throw new Error('Invalid Mermaid: must start with \"flowchart TD\" (or TB/BT/RL/LR)');\n}\n\n// 2. XSS/injection prevention\nconst xssPatterns = [\n  /<script/i,\n  /javascript:/i,\n  /on\\w+\\s*=/i,\n  /<iframe/i,\n  /<object/i,\n  /<embed/i,\n  /data:text\\/html/i,\n];\nfor (const pattern of xssPatterns) {\n  if (pattern.test(mermaid_code)) {\n    throw new Error(`Security: injection pattern detected in Mermaid code: ${pattern}`);\n  }\n}\n\n// 3. Count nodes (lines with node definitions: ID[...], ID{...}, ID([...]), ID[/...\\])\nconst nodePattern = /^\\s*[A-Za-z0-9_]+\\s*[\\[\\({]/gm;\nconst nodeMatches = mermaid_code.match(nodePattern) || [];\n// Deduplicate node IDs (same node can appear in edge definitions)\nconst nodeIds = new Set();\nconst idExtract = /^\\s*([A-Za-z0-9_]+)/;\nfor (const match of nodeMatches) {\n  const id = match.match(idExtract)?.[1];\n  if (id) nodeIds.add(id);\n}\n\nif (nodeIds.size > 20) {\n  throw new Error(`Node count ${nodeIds.size} exceeds maximum of 20. Reduce complexity.`);\n}\n\nif (nodeIds.size === 0) {\n  throw new Error('No nodes detected in Mermaid code');\n}\n\n// 4. Sanitize: remove any null bytes or control chars (keep newlines/tabs)\nconst sanitized = mermaid_code.replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]/g, '');\n\nreturn [{\n  json: {\n    flowchart_id,\n    mermaid_code: sanitized,\n    title: title.substring(0, 200),     // Cap title length\n    summary: summary.substring(0, 2000), // Cap summary length\n    node_count: nodeIds.size,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        340
+      ],
+      "id": "a1b2c3d4-0005-4000-8000-000000000005",
+      "name": "Validate Mermaid"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://qreqmcprolrpqkrdpwrl.supabase.co/rest/v1/flowcharts?id=eq.{{ $json.flowchart_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"mermaid_code\": {{ JSON.stringify($json.mermaid_code) }},\n  \"summary\": {{ JSON.stringify($json.summary) }},\n  \"title\": {{ JSON.stringify($json.title) }},\n  \"generation_status\": \"completed\",\n  \"error_message\": null\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        340
+      ],
+      "id": "a1b2c3d4-0006-4000-8000-000000000006",
+      "name": "Update Flowchart - Success",
+      "credentials": {
+        "supabaseApi": {
+          "id": "Z72m4xkuIEBqxMlM",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -140,
+        560
+      ],
+      "id": "a1b2c3d4-0014-4000-8000-000000000014",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "syHUxLmNIXSrPaSC",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        680
+      ],
+      "id": "a1b2c3d4-0007-4000-8000-000000000007",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Error Trigger provides error details in $input.first().json\nconst error = $input.first().json;\n\n// Get flowchart_id from the workflow execution context\n// Try nodes in order of reliability\nlet flowchartId = null;\ntry {\n  flowchartId = $('Validate Input').first().json.flowchart_id;\n} catch (e) {\n  // If Validate Input itself failed, try webhook body\n  // ⚠️ CRITICAL: Webhook data is under .body (n8n-code-javascript skill)\n  try {\n    flowchartId = $('Webhook').first().json.body?.flowchart_id;\n  } catch (e2) {\n    // Cannot determine flowchart_id — return error info without DB update\n    return [{ json: { error: 'Cannot determine flowchart_id', original_error: error.message } }];\n  }\n}\n\n// Guard: if flowchartId is still null, we can't update DB\nif (!flowchartId) {\n  return [{ json: { error: 'flowchart_id is null', original_error: error.message } }];\n}\n\nconst errorMessage = error.message || error.description || 'Unknown workflow error';\n\n// Return format: [{json: {...}}] — n8n Code Node requirement\nreturn [{\n  json: {\n    flowchart_id: flowchartId,\n    error_message: errorMessage.substring(0, 1000),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -140,
+        680
+      ],
+      "id": "a1b2c3d4-0008-4000-8000-000000000008",
+      "name": "Extract Error Info"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-flowchart-id-exists",
+              "leftValue": "={{ $json.flowchart_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        140,
+        680
+      ],
+      "id": "a1b2c3d4-0009-4000-8000-000000000009",
+      "name": "Has Flowchart ID?"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://qreqmcprolrpqkrdpwrl.supabase.co/rest/v1/flowcharts?id=eq.{{ $json.flowchart_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"generation_status\": \"failed\",\n  \"error_message\": {{ JSON.stringify($json.error_message) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        640
+      ],
+      "id": "a1b2c3d4-0010-4000-8000-000000000010",
+      "name": "Update Flowchart - Failed",
+      "credentials": {
+        "supabaseApi": {
+          "id": "Z72m4xkuIEBqxMlM",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "[![InsightsLM](https://www.theaiautomators.com/wp-content/uploads/2025/03/gray-logo.png)](https://www.theaiautomators.com/)\n## InsightsLM - Generate Flowchart\nConverts document text → Mermaid.js flowchart via GPT-4o.\nPipeline: Webhook → Validate → AI → Parse → Validate Mermaid → Supabase PATCH",
+        "height": 220,
+        "width": 380,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1020,
+        200
+      ],
+      "id": "a1b2c3d4-0011-4000-8000-000000000011",
+      "name": "Sticky Note - Header"
+    },
+    {
+      "parameters": {
+        "content": "## 🛡️ ERROR HANDLER\nCatches ANY error from the main flow.\nExtracts flowchart_id → marks record as `failed`.\nGuards against null flowchart_id (IF node).",
+        "height": 180,
+        "width": 350,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        600
+      ],
+      "id": "a1b2c3d4-0012-4000-8000-000000000012",
+      "name": "Sticky Note - Error Handler"
+    },
+    {
+      "parameters": {
+        "content": "## 🔒 SECURITY\n- XSS patterns checked (7 patterns)\n- Node count ≤ 20\n- Title capped at 200 chars\n- Summary capped at 2000 chars\n- Control chars stripped",
+        "height": 180,
+        "width": 280,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        320,
+        140
+      ],
+      "id": "a1b2c3d4-0013-4000-8000-000000000013",
+      "name": "Sticky Note - Security"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Generate Flowchart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Flowchart": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Validate Mermaid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Mermaid": {
+      "main": [
+        [
+          {
+            "node": "Update Flowchart - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Error Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Error Info": {
+      "main": [
+        [
+          {
+            "node": "Has Flowchart ID?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Flowchart ID?": {
+      "main": [
+        [
+          {
+            "node": "Update Flowchart - Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Flowchart",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "executionTimeout": 120,
+    "errorWorkflow": "",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "00000000-0000-4000-8000-000000000001",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8aa65990611bf8c8eff44388d5865e91c835317eab848ea9b81a93b6e1a15d69"
+  },
+  "id": "",
+  "tags": [
+    {
+      "id": "JoQexUOz3iYBucBb",
+      "name": "TheAIAutomators.com"
+    }
+  ]
+}

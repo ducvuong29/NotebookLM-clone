@@ -63,6 +63,9 @@ playwright-report/
 test-results/
 fix_lint.cjs
 tmp-parser.cjs
+test-results.json
+playwright/.auth/
+lint-result.json
 
 # AI Agent, Planning, and Non-Execution Artifacts
 .agent/

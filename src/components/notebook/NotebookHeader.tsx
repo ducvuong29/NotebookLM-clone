@@ -1,9 +1,8 @@
-import React, { useState, Suspense } from 'react';
+import React, { Suspense, useState } from 'react';
+import { ArrowLeft, LogOut, User, Users, Workflow } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { User, LogOut, ArrowLeft } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useNotebookUpdate } from '@/hooks/useNotebookUpdate';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,25 +10,28 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useLogout } from '@/services/authService';
+import { useNotebookUpdate } from '@/hooks/useNotebookUpdate';
+import { useNotebookMembers } from '@/hooks/useCollaborationApi';
 import Logo from '@/components/ui/Logo';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import PermissionBadge from './PermissionBadge';
-import { Users } from 'lucide-react';
 import CollaborationErrorBoundary from './CollaborationErrorBoundary';
-import { useNotebookMembers } from '@/hooks/useCollaborationApi';
 
 const MemberPanel = React.lazy(() => import('./MemberPanel'));
-
 
 interface NotebookHeaderProps {
   title: string;
   notebookId?: string;
   notebookOwnerId?: string;
-  // Permission props — derived from useNotebookPermissions in Notebook.tsx
   role?: string | null;
   canEdit?: boolean;
   canInvite?: boolean;
   isMember?: boolean;
+  showFlowchartToggle?: boolean;
+  isFlowchartActive?: boolean;
+  onToggleFlowchart?: () => void;
+  onNavigateHome?: () => void;
+  onNavigateBack?: () => void;
 }
 
 const NotebookHeader = ({
@@ -40,19 +42,21 @@ const NotebookHeader = ({
   canEdit = true,
   canInvite = false,
   isMember = false,
+  showFlowchartToggle = false,
+  isFlowchartActive = false,
+  onToggleFlowchart,
+  onNavigateHome,
+  onNavigateBack,
 }: NotebookHeaderProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useLogout();
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(title);
-  const { updateNotebook, isUpdating } = useNotebookUpdate();
   const [isMemberPanelOpen, setIsMemberPanelOpen] = useState(false);
-  
-  // Detect if user came from a search result (via location.state)
-  const fromSearch = (location.state as { fromSearch?: string })?.fromSearch;
+  const { updateNotebook, isUpdating } = useNotebookUpdate();
 
-  // Member count — uses TanStack Query dedup (same key as Notebook.tsx's useNotebookPermissions)
+  const fromSearch = (location.state as { fromSearch?: string })?.fromSearch;
   const { data: members } = useNotebookMembers(notebookId);
   const memberCount = members?.length ?? 0;
 
@@ -67,27 +71,27 @@ const NotebookHeader = ({
     if (notebookId && editedTitle.trim() && editedTitle !== title) {
       updateNotebook({
         id: notebookId,
-        updates: { title: editedTitle.trim() }
+        updates: { title: editedTitle.trim() },
       });
     }
+
     setIsEditing(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') {
       handleTitleSubmit();
-    } else if (e.key === 'Escape') {
+    } else if (event.key === 'Escape') {
       setEditedTitle(title);
       setIsEditing(false);
     }
   };
 
-  const handleBlur = () => {
-    handleTitleSubmit();
-  };
-
   const handleBackClick = () => {
-    // [search state preservation] When navigating back from search result, preserve the search query
+    if (onNavigateBack) {
+      onNavigateBack();
+      return;
+    }
     if (fromSearch) {
       navigate(`/?q=${encodeURIComponent(fromSearch)}`);
     } else {
@@ -95,55 +99,54 @@ const NotebookHeader = ({
     }
   };
 
-  const handleIconClick = () => {
-    navigate('/');
-  };
-
   return (
-    <header className="bg-background border-b border-border px-6 py-4">
+    <header className="border-b border-border bg-background px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             {fromSearch ? (
-              /* Breadcrumb when coming from search — shows text for context */
               <button
                 aria-label="Quay lại Dashboard"
                 onClick={handleBackClick}
-                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-muted"
+                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <ArrowLeft className="h-4 w-4" />
                 <span>Quay lại Dashboard</span>
               </button>
             ) : (
-              <button 
+              <button
                 aria-label="Về trang trước"
                 onClick={handleBackClick}
-                className="hover:bg-muted rounded transition-colors p-2 text-muted-foreground hover:text-foreground"
+                className="rounded p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
             )}
-            <button 
+
+            <button
               aria-label="Về trang chủ"
-              onClick={handleIconClick}
-              className="hover:bg-muted rounded transition-colors p-1"
+              onClick={() => onNavigateHome ? onNavigateHome() : navigate('/')}
+              className="rounded p-1 transition-colors hover:bg-muted"
             >
               <Logo />
             </button>
+
             {isEditing ? (
               <Input
                 value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
+                onChange={(event) => setEditedTitle(event.target.value)}
                 onKeyDown={handleKeyDown}
-                onBlur={handleBlur}
-                className="text-lg font-medium text-foreground border-none shadow-none p-0 h-auto focus-visible:ring-0 min-w-[300px] w-auto"
+                onBlur={handleTitleSubmit}
+                className="h-auto min-w-[300px] w-auto border-none p-0 text-lg font-medium text-foreground shadow-none focus-visible:ring-0"
                 autoFocus
                 disabled={isUpdating}
               />
             ) : (
               <div className="flex items-center space-x-3">
-                <span 
-                  className={`text-lg font-medium text-foreground ${canEdit ? 'cursor-pointer hover:bg-muted' : 'cursor-default'} rounded px-2 py-1 transition-colors`}
+                <span
+                  className={`rounded px-2 py-1 text-lg font-medium text-foreground transition-colors ${
+                    canEdit ? 'cursor-pointer hover:bg-muted' : 'cursor-default'
+                  }`}
                   onClick={handleTitleClick}
                 >
                   {title}
@@ -153,31 +156,30 @@ const NotebookHeader = ({
             )}
           </div>
         </div>
-        
+
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            {/* Allow all members to see the MemberPanel to view the list of members */}
             {isMember && notebookId && (
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setIsMemberPanelOpen(true)}
                 className="hidden md:flex"
               >
-                <Users className="h-4 w-4 mr-2" />
+                <Users className="mr-2 h-4 w-4" />
                 Thành viên
-                {/* AC #7: Member count badge next to Share button */}
                 {memberCount > 1 && (
-                  <span className="ml-1.5 bg-primary/10 text-primary text-xs font-medium rounded-full px-1.5 min-w-[20px] text-center">
+                  <span className="ml-1.5 min-w-[20px] rounded-full bg-primary/10 px-1.5 text-center text-xs font-medium text-primary">
                     {memberCount}
                   </span>
                 )}
               </Button>
             )}
+
             {isMemberPanelOpen && notebookId && (
               <CollaborationErrorBoundary>
                 <Suspense fallback={null}>
-                  <MemberPanel 
+                  <MemberPanel
                     notebookId={notebookId}
                     notebookOwnerId={notebookOwnerId}
                     isOpen={isMemberPanelOpen}
@@ -186,18 +188,33 @@ const NotebookHeader = ({
                 </Suspense>
               </CollaborationErrorBoundary>
             )}
+
+            {showFlowchartToggle && onToggleFlowchart && (
+              <Button
+                type="button"
+                variant={isFlowchartActive ? 'default' : 'outline'}
+                size="sm"
+                onClick={onToggleFlowchart}
+                className="hidden md:inline-flex"
+              >
+                <Workflow className="h-4 w-4" />
+                {isFlowchartActive ? 'Studio' : 'Sơ đồ'}
+              </Button>
+            )}
+
             <ThemeToggle />
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button aria-label="Menu người dùng" variant="ghost" size="sm" className="p-0">
-                  <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center cursor-pointer hover:bg-purple-600 transition-colors">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500 transition-colors hover:bg-purple-600">
                     <User className="h-4 w-4 text-white" />
                   </div>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem onClick={logout} className="cursor-pointer">
-                  <LogOut className="h-4 w-4 mr-2" />
+                  <LogOut className="mr-2 h-4 w-4" />
                   Sign Out
                 </DropdownMenuItem>
               </DropdownMenuContent>

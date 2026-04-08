@@ -2,6 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import type { Database } from '@/integrations/supabase/types';
+
+type NotebookRow = Database['public']['Tables']['notebooks']['Row'];
+
+type NotebookRealtimePayload = {
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  new: NotebookRow;
+  old: NotebookRow;
+};
 
 export const useNotebooks = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -66,16 +75,44 @@ export const useNotebooks = () => {
     if (!user?.id || !isAuthenticated) return;
 
     const channel = supabase
-      .channel('notebooks-changes')
+      .channel(`notebooks-changes-${user.id}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'notebooks',
+          filter: `user_id=eq.${user.id}`,
         },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['notebooks', user.id] });
+        (payload) => {
+          const notebookPayload = payload as unknown as NotebookRealtimePayload;
+
+          queryClient.setQueryData(['notebooks', user.id], (old: NotebookRow[] = []) => {
+            switch (notebookPayload.eventType) {
+              case 'INSERT': {
+                const newItem = notebookPayload.new;
+                if (old.some((item) => item.id === newItem.id)) return old;
+                return [newItem, ...old];
+              }
+              case 'UPDATE': {
+                return old.map((item) =>
+                  item.id === notebookPayload.new.id
+                    ? { ...item, ...notebookPayload.new }
+                    : item
+                );
+              }
+              case 'DELETE': {
+                return old.filter((item) => item.id !== notebookPayload.old.id);
+              }
+              default:
+                return old;
+            }
+          });
+
+          // Soft refetch for computed fields (sources count) after 2s
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ['notebooks', user.id] });
+          }, 2000);
         }
       )
       .subscribe();

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, MoreVertical, Trash2, Edit, Loader2, CheckCircle, XCircle, Upload } from 'lucide-react';
+import { Plus, MoreVertical, Trash2, Edit, Loader2, CheckCircle, XCircle, Upload, GitBranch, ChevronLeft, PanelLeftClose } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
@@ -27,6 +27,9 @@ interface SourcesSidebarProps {
   setSelectedCitation?: (citation: Citation | null) => void;
   canEdit?: boolean;
   canDelete?: boolean;
+  onGenerateFlowchart?: (sourceId: string) => void;
+  flowchartStatusMap?: Map<string, string>;
+  onCloseSidebar?: () => void;
 }
 
 const SourcesSidebar = ({
@@ -37,6 +40,9 @@ const SourcesSidebar = ({
   setSelectedCitation,
   canEdit = true,
   canDelete = true,
+  onGenerateFlowchart,
+  flowchartStatusMap = new Map<string, string>(),
+  onCloseSidebar,
 }: SourcesSidebarProps) => {
   const [showAddSourcesDialog, setShowAddSourcesDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -184,15 +190,13 @@ const SourcesSidebar = ({
     return (
       <div className="w-full bg-muted/30 border-r border-border flex flex-col h-full overflow-hidden">
         <div className="p-4 border-b border-border flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-foreground cursor-pointer hover:text-foreground/80" onClick={handleBackToSources}>
-              Sources
-            </h2>
-            <Button variant="ghost" onClick={handleBackToSources} className="p-2 [&_svg]:!w-6 [&_svg]:!h-6">
-              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor">
-                <path d="M440-440v240h-80v-160H200v-80h240Zm160-320v160h160v80H520v-240h80Z" />
-              </svg>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={handleBackToSources} className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground">
+              <ChevronLeft className="h-5 w-5" />
             </Button>
+            <h2 className="text-sm font-medium text-foreground truncate cursor-pointer hover:underline" onClick={handleBackToSources}>
+              Nguồn tài liệu
+            </h2>
           </div>
         </div>
         
@@ -213,6 +217,11 @@ const SourcesSidebar = ({
       <div className="p-4 border-b border-border flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium text-foreground">Nguồn tài liệu</h2>
+          {onCloseSidebar && (
+            <Button variant="ghost" size="icon" onClick={onCloseSidebar} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+              <PanelLeftClose className="h-5 w-5" />
+            </Button>
+          )}
         </div>
         
         {canEdit && (
@@ -248,7 +257,27 @@ const SourcesSidebar = ({
                             <span className="text-sm text-foreground truncate block">{source.title}</span>
                           </div>
                         </div>
-                        <div className="flex-shrink-0 py-[4px]">
+                        <div className="flex-shrink-0 py-[4px] flex items-center space-x-1">
+                          {source.processing_status === 'completed' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onGenerateFlowchart?.(source.id);
+                              }}
+                              disabled={flowchartStatusMap.get(source.id) === 'generating'}
+                              aria-label={`Tạo sơ đồ cho ${source.title}`}
+                              title="Tạo sơ đồ"
+                            >
+                              {flowchartStatusMap.get(source.id) === 'generating' ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <GitBranch className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
                           {renderProcessingStatus(source.processing_status)}
                         </div>
                       </div>
