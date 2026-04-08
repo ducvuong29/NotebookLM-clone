@@ -114,18 +114,12 @@ export const FlowchartFullscreenModal = memo(function FlowchartFullscreenModal({
       role="dialog"
       aria-modal="true"
       aria-label="Xem toàn màn hình sơ đồ"
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm p-4 md:p-8 transition-all"
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-
       {/* Modal content */}
-      <div className="relative z-10 flex h-[92vh] w-[96vw] max-w-7xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+      <div className="flex h-[calc(100vh-2rem)] md:h-[calc(100vh-4rem)] w-[calc(100vw-2rem)] md:w-[calc(100vw-4rem)] max-w-7xl flex-col overflow-hidden bg-card rounded-xl border border-border shadow-2xl ring-1 ring-border/50">
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-3">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-card px-5 py-3">
           <div className="flex items-center gap-3">
             <h2 className="text-base font-semibold text-foreground">
               {title ?? 'Xem sơ đồ toàn màn hình'}
@@ -199,9 +193,9 @@ export const FlowchartFullscreenModal = memo(function FlowchartFullscreenModal({
         )}
 
         {/* Canvas */}
-        <div className="flex min-h-0 flex-1 items-stretch justify-stretch overflow-hidden p-4">
+        <div className="flex min-h-0 flex-1 items-stretch justify-stretch overflow-hidden">
           {!mermaidCode.trim() ? (
-            <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-background/50 text-sm text-muted-foreground">
+            <div className="flex flex-1 items-center justify-center bg-background/50 text-sm text-muted-foreground">
               Chưa có mã Mermaid để hiển thị.
             </div>
           ) : !renderedSvg && !errorMessage ? (
@@ -213,7 +207,7 @@ export const FlowchartFullscreenModal = memo(function FlowchartFullscreenModal({
             <div
               ref={svgContainerRef}
               data-testid="flowchart-fullscreen-canvas"
-              className="h-full w-full overflow-hidden rounded-lg border border-border/70 bg-background/80 shadow-sm"
+              className="h-full w-full overflow-hidden bg-background"
               dangerouslySetInnerHTML={{ __html: renderedSvg }}
             />
           ) : null}
