@@ -1,9 +1,9 @@
-import React, { lazy, Suspense, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { lazy, Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { RegenerateFlowchartDialog } from '@/components/flowchart/RegenerateFlowchartDialog';
 import { UnsavedChangesDialog } from '@/components/flowchart/UnsavedChangesDialog';
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, GripVertical } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, GripVertical, Plus } from 'lucide-react';
 import { PanelGroup, Panel, PanelResizeHandle } from 'react-resizable-panels';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,77 @@ const FlowchartPanel = lazy(() =>
   import('@/components/flowchart/FlowchartPanel').then((module) => ({
     default: module.FlowchartPanel,
   }))
+);
+
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  FileText, Link as LinkIcon, File, AudioLines, Network, 
+  Presentation, BookOpen, MessageCircleQuestion, BarChart2, Table 
+} from 'lucide-react';
+
+interface CollapsedSidebarRailProps {
+  side: 'left' | 'right';
+  onOpen: () => void;
+  actionTooltip?: string;
+  children?: React.ReactNode;
+}
+
+const CollapsedSidebarRail = ({ side, onOpen, actionTooltip, children }: CollapsedSidebarRailProps) => {
+  const edgeClass = side === 'left' ? 'left-4' : 'right-4';
+  const PanelIcon = side === 'left' ? PanelLeftOpen : PanelRightOpen;
+
+  return (
+    <div className={`absolute top-4 bottom-4 z-20 hidden md:flex w-[56px] flex-col items-center rounded-[28px] border border-border/60 bg-background/95 p-2 shadow-lg backdrop-blur-md ${edgeClass}`}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={onOpen}
+        aria-label={side === 'left' ? 'Mở nguồn' : 'Mở studio'}
+        title={side === 'left' ? 'Mở nguồn' : 'Mở studio'}
+        className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <PanelIcon className="h-5 w-5" />
+      </Button>
+      
+      {actionTooltip && (
+        <>
+          <div className="my-2 h-[1px] w-6 bg-border shrink-0" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onOpen}
+            title={actionTooltip}
+            aria-label={actionTooltip}
+            className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground mb-2"
+          >
+            <Plus className="h-6 w-6" strokeWidth={2} />
+          </Button>
+        </>
+      )}
+
+      {children && (
+        <ScrollArea className="flex-1 w-full flex flex-col pt-2 no-scrollbar">
+          <div className="flex flex-col items-center gap-3 pb-4">
+            {children}
+          </div>
+        </ScrollArea>
+      )}
+    </div>
+  );
+};
+
+const StudioRailIcon = ({ icon: Icon, bgColor, iconColor, onOpen }: { icon: React.ElementType, bgColor: string, iconColor: string, onOpen: () => void }) => (
+  <button 
+    onClick={onOpen}
+    className={`relative flex items-center justify-center w-11 h-11 rounded-2xl ${bgColor} hover:brightness-95 dark:hover:brightness-110 transition-all shrink-0`}
+  >
+    <Icon className={`w-5 h-5 ${iconColor}`} />
+    <span className="absolute bottom-0 right-0 translate-x-1/4 translate-y-1/4 flex items-center justify-center bg-background rounded-full w-4 h-4 border border-background shadow-sm">
+       <Plus className="w-3 h-3 text-muted-foreground" strokeWidth={4} />
+    </span>
+  </button>
 );
 
 interface SidebarDockButtonProps {
@@ -93,19 +164,26 @@ const Notebook = () => {
   const { generateFlowchartAsync, isGenerating: isFlowchartGenerating } = useGenerateFlowchart(notebookId);
   const [activeFlowchartSourceId, setActiveFlowchartSourceId] = useState<string | null>(null);
   const [pendingRegenerateSourceId, setPendingRegenerateSourceId] = useState<string | null>(null);
-  const [isFlowchartDirty, setIsFlowchartDirty] = useState(false);
+  const [isFlowchartDirty, setIsFlowchartDirtyState] = useState(false);
+  const isFlowchartDirtyRef = useRef(isFlowchartDirty);
+
+  const setIsFlowchartDirty = useCallback((dirty: boolean) => {
+    setIsFlowchartDirtyState(dirty);
+    isFlowchartDirtyRef.current = dirty;
+  }, []);
+
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const { toast } = useToast();
 
   const guardedAction = useCallback((action: () => void) => {
-    if (isFlowchartDirty) {
+    if (isFlowchartDirtyRef.current) {
       setPendingAction(() => action);
       setShowUnsavedDialog(true);
     } else {
       action();
     }
-  }, [isFlowchartDirty]);
+  }, []);
 
   const flowchartGeneratingStatus = useMemo(() => {
     const map = new Map<string, string>();
@@ -196,17 +274,21 @@ const Notebook = () => {
     setSelectedCitation(null);
   };
 
-  const handleFlowchartToggle = () => {
+  const handleFlowchartToggle = (sourceId?: string) => {
     guardedAction(() => {
-      if (!showFlowchart) {
+      if (!showFlowchart || sourceId) {
         setHasLoadedFlowchart(true);
-        setActiveFlowchartSourceId(
-          selectedCitation?.source_id ?? activeFlowchartSourceId ?? sources?.[0]?.id ?? null
-        );
+        if (typeof sourceId === 'string') {
+          setActiveFlowchartSourceId(sourceId);
+        } else if (!showFlowchart) {
+          setActiveFlowchartSourceId(
+            selectedCitation?.source_id ?? activeFlowchartSourceId ?? sources?.[0]?.id ?? null
+          );
+        }
       }
 
       setShowRightSidebar(true);
-      setShowFlowchart((currentValue) => !currentValue);
+      setShowFlowchart(sourceId ? true : !showFlowchart);
     });
   };
 
@@ -340,18 +422,38 @@ const Notebook = () => {
 
             <Panel id="chat-panel" order={2} className="relative min-w-0">
               {!showSourcesSidebar && (
-                <SidebarDockButton
+                <CollapsedSidebarRail
                   side="left"
-                  action="open"
-                  onClick={() => setShowSourcesSidebar(true)}
-                />
+                  onOpen={() => setShowSourcesSidebar(true)}
+                  actionTooltip="Thêm nguồn"
+                >
+                  {sources?.map(source => (
+                    <div 
+                      key={source.id} 
+                      className="w-11 h-11 shrink-0 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center cursor-pointer hover:bg-zinc-800 transition-colors"
+                      onClick={() => setShowSourcesSidebar(true)}
+                      title={source.title}
+                    >
+                      {source.type === 'pdf' ? (
+                        <div className="bg-red-500 text-white text-[10px] font-bold px-1 py-0.5 rounded-sm">PDF</div>
+                      ) : source.type === 'youtube' ? (
+                        <div className="text-red-500 font-bold">&#9654;</div>
+                      ) : (
+                        <FileText className="h-5 w-5 text-blue-400" />
+                      )}
+                    </div>
+                  ))}
+                </CollapsedSidebarRail>
               )}
               {!showRightSidebar && (
-                <SidebarDockButton
+                <CollapsedSidebarRail
                   side="right"
-                  action="open"
-                  onClick={() => setShowRightSidebar(true)}
-                />
+                  onOpen={() => setShowRightSidebar(true)}
+                  actionTooltip="Mở Studio"
+                >
+                   <StudioRailIcon icon={AudioLines} bgColor="bg-muted" iconColor="text-foreground" onOpen={() => setShowRightSidebar(true)} />
+                   <StudioRailIcon icon={Network} bgColor="bg-muted" iconColor="text-foreground" onOpen={() => setShowRightSidebar(true)} />
+                </CollapsedSidebarRail>
               )}
               <ErrorBoundary key={notebookId}>
                 <ChatArea
@@ -395,6 +497,8 @@ const Notebook = () => {
                         canEdit={canEdit}
                         canDelete={canDelete}
                         isMember={isMember}
+                        onOpenFlowchart={handleFlowchartToggle}
+                        hasSource={hasSource}
                       />
                     </div>
 
@@ -409,6 +513,7 @@ const Notebook = () => {
                       {hasLoadedFlowchart ? (
                         <Suspense fallback={<FlowchartSkeleton />}>
                           <FlowchartPanel
+                            key={`flowchart-panel-${activeFlowchartSourceId ?? 'empty'}`}
                             flowchartData={activeFlowchartData}
                             sourceName={activeFlowchartSource?.title}
                             onSave={handleFlowchartSave}
