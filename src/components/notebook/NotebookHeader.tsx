@@ -189,18 +189,7 @@ const NotebookHeader = ({
               </CollaborationErrorBoundary>
             )}
 
-            {showFlowchartToggle && onToggleFlowchart && (
-              <Button
-                type="button"
-                variant={isFlowchartActive ? 'default' : 'outline'}
-                size="sm"
-                onClick={onToggleFlowchart}
-                className="hidden md:inline-flex"
-              >
-                <Workflow className="h-4 w-4" />
-                {isFlowchartActive ? 'Studio' : 'Sơ đồ'}
-              </Button>
-            )}
+
 
             <ThemeToggle />
 
