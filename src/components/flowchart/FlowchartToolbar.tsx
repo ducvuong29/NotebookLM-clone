@@ -2,12 +2,6 @@ import { memo } from 'react';
 import { FileImage, FileText, Loader2, Save, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -20,7 +14,6 @@ interface FlowchartToolbarProps {
   saveDisabledReason?: string;
   onSave: () => void;
   onExportPng: () => void;
-  onExportPdf: () => void;
   isExporting: boolean;
   exportDisabledReason?: string;
 }
@@ -31,7 +24,6 @@ export const FlowchartToolbar = memo(function FlowchartToolbar({
   saveDisabledReason,
   onSave,
   onExportPng,
-  onExportPdf,
   isExporting,
   exportDisabledReason,
 }: FlowchartToolbarProps) {
@@ -49,12 +41,13 @@ export const FlowchartToolbar = memo(function FlowchartToolbar({
     <Button
       type="button"
       variant="outline"
-      disabled={isExporting}
-      aria-label="Mở menu xuất sơ đồ"
-      className="export-btn-ripple"
+      onClick={onExportPng}
+      disabled={isExportItemDisabled}
+      aria-label="Xuất sơ đồ (PNG)"
+      className="export-btn-ripple min-w-[124px]"
     >
-      {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
-      {isExporting ? 'Đang xuất...' : 'Xuất'}
+      {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileImage className="h-4 w-4" />}
+      {isExporting ? 'Đang xuất...' : 'Xuất PNG'}
     </Button>
   );
 
@@ -78,38 +71,18 @@ export const FlowchartToolbar = memo(function FlowchartToolbar({
           saveButton
         )}
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            {exportDisabledReason ? (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>{exportTriggerButton}</span>
-                  </TooltipTrigger>
-                  <TooltipContent>{exportDisabledReason}</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ) : (
-              exportTriggerButton
-            )}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              disabled={isExportItemDisabled}
-              onClick={onExportPng}
-            >
-              <FileImage className="mr-2 h-4 w-4" />
-              PNG
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={isExportItemDisabled}
-              onClick={onExportPdf}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              PDF
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {exportDisabledReason ? (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>{exportTriggerButton}</span>
+              </TooltipTrigger>
+              <TooltipContent>{exportDisabledReason}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          exportTriggerButton
+        )}
       </div>
     </div>
   );

@@ -9,7 +9,6 @@ interface UseFlowchartExportOptions {
 
 interface UseFlowchartExportReturn {
   exportPng: () => Promise<void>;
-  exportPdf: () => Promise<void>;
   isExporting: boolean;
 }
 
@@ -50,10 +49,15 @@ async function renderExportComposite(params: {
 }): Promise<{ container: HTMLDivElement; cleanup: () => void }> {
   const { title, summary, mermaidCode } = params;
 
-  // Create off-screen container
+  // Create an invisible wrapper to keep it off-screen without breaking html-to-image
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed; top:0; left:0; width:0; height:0; overflow:hidden; z-index:-9999; pointer-events:none;';
+
+  // Create the actual container to be captured
   const container = document.createElement('div');
+  // Add color:#000000 to prevent inheriting white text from dark mode root
   container.style.cssText =
-    'position:absolute;left:-9999px;top:0;width:1200px;padding:40px;background:#ffffff;font-family:"Inter Variable",Inter,sans-serif;';
+    'width:1200px;padding:40px;background:#ffffff;color:#000000;font-family:"Inter Variable",Inter,sans-serif;';
 
   // Title
   const titleEl = document.createElement('h1');
@@ -91,14 +95,22 @@ async function renderExportComposite(params: {
 
   const svgWrapper = document.createElement('div');
   svgWrapper.innerHTML = svg;
+  
+  // Ensure the SVG itself has a defined dimension within the flex/block context if needed,
+  // but Mermaid usually defines max-width. We'll ensure the wrapper handles it.
+  svgWrapper.style.cssText = 'width:100%; display:flex; justify-content:flex-start;';
   container.appendChild(svgWrapper);
 
   // Append to body so html-to-image can capture it
-  document.body.appendChild(container);
+  wrapper.appendChild(container);
+  document.body.appendChild(wrapper);
+
+  // Allow browser time to paint SVG and apply layout before taking the snapshot
+  await new Promise((resolve) => setTimeout(resolve, 300)); // Increased delay for safety
 
   return {
     container,
-    cleanup: () => container.remove(),
+    cleanup: () => wrapper.remove(),
   };
 }
 
@@ -138,80 +150,5 @@ export function useFlowchartExport(
     }
   }, [options.title, options.summary, options.mermaidCode]);
 
-  const exportPdf = useCallback(async () => {
-    setIsExporting(true);
-    let cleanup: (() => void) | undefined;
-
-    try {
-      // Generate PNG first using the composite renderer
-      const { toPng } = await import('html-to-image');
-      const composed = await renderExportComposite({
-        title: options.title,
-        summary: options.summary,
-        mermaidCode: options.mermaidCode,
-      });
-      cleanup = composed.cleanup;
-
-      const pngDataUrl = await toPng(composed.container, {
-        pixelRatio: 2,
-        backgroundColor: '#ffffff',
-        cacheBust: true,
-      });
-
-      cleanup();
-      cleanup = undefined;
-
-      // Create PDF
-      const { jsPDF } = await import('jspdf');
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-
-      // Page dimensions (A4 landscape: 297 x 210 mm)
-      const pageWidth = 297;
-      const pageHeight = 210;
-      const margin = 15;
-      const contentWidth = pageWidth - margin * 2;
-
-      // Title
-      doc.setFontSize(18);
-      doc.text(options.title, margin, 20);
-
-      // Summary
-      let currentY = 28;
-      if (options.summary.trim()) {
-        doc.setFontSize(11);
-        const summaryLines = doc.splitTextToSize(options.summary, contentWidth);
-        doc.text(summaryLines, margin, currentY);
-        const summaryHeight = summaryLines.length * 5; // ~5mm per line at 11pt
-        currentY += summaryHeight + 5;
-      }
-
-      // Add PNG image — fit remaining page area maintaining aspect ratio
-      const img = new Image();
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('Failed to load export image'));
-        img.src = pngDataUrl;
-      });
-
-      const remainingHeight = pageHeight - currentY - margin;
-      const imgAspect = img.width / img.height;
-      let imgWidth = contentWidth;
-      let imgHeight = imgWidth / imgAspect;
-
-      if (imgHeight > remainingHeight) {
-        imgHeight = remainingHeight;
-        imgWidth = imgHeight * imgAspect;
-      }
-
-      doc.addImage(pngDataUrl, 'PNG', margin, currentY, imgWidth, imgHeight);
-
-      const filename = `${sanitizeFilename(options.title)}-flowchart.pdf`;
-      doc.save(filename);
-    } finally {
-      cleanup?.();
-      setIsExporting(false);
-    }
-  }, [options.title, options.summary, options.mermaidCode]);
-
-  return { exportPng, exportPdf, isExporting };
+  return { exportPng, isExporting };
 }

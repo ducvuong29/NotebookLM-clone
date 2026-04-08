@@ -60,8 +60,13 @@ export const FlowchartPanel = memo(function FlowchartPanel({
   const initialTitle = flowchartData?.title ?? '';
   const initialSummary = flowchartData?.summary ?? '';
   const initialMermaidCode = flowchartData?.mermaid_code ?? '';
+  
+  const normalizeString = (str: string) => str.replace(/\r\n/g, '\n').trim();
+
   const isDirty =
-    title !== initialTitle || summary !== initialSummary || mermaidCode !== initialMermaidCode;
+    normalizeString(title) !== normalizeString(initialTitle) ||
+    normalizeString(summary) !== normalizeString(initialSummary) ||
+    normalizeString(mermaidCode) !== normalizeString(initialMermaidCode);
   const isCodeEmpty = mermaidCode.trim().length === 0;
   const isCodeSafe = !isCodeEmpty && isSupportedMermaidCode(mermaidCode);
 
@@ -83,7 +88,7 @@ export const FlowchartPanel = memo(function FlowchartPanel({
   }
 
   // Export logic
-  const { exportPng, exportPdf, isExporting } = useFlowchartExport({
+  const { exportPng, isExporting } = useFlowchartExport({
     title,
     summary,
     mermaidCode,
@@ -110,19 +115,6 @@ export const FlowchartPanel = memo(function FlowchartPanel({
       });
     }
   }, [exportPng, toast]);
-
-  const handleExportPdf = useCallback(async () => {
-    try {
-      await exportPdf();
-      toast({ title: 'Đã xuất PDF thành công!' });
-    } catch {
-      toast({
-        title: 'Lỗi xuất sơ đồ',
-        description: 'Không thể tạo file PDF. Vui lòng thử lại.',
-        variant: 'destructive',
-      });
-    }
-  }, [exportPdf, toast]);
 
   const handleSave = async () => {
     if (!flowchartData || saveDisabledReason) {
@@ -239,7 +231,6 @@ export const FlowchartPanel = memo(function FlowchartPanel({
         saveDisabledReason={saveDisabledReason}
         onSave={handleSave}
         onExportPng={handleExportPng}
-        onExportPdf={handleExportPdf}
         isExporting={isExporting}
         exportDisabledReason={exportDisabledReason}
       />
