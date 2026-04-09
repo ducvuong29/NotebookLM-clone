@@ -2,7 +2,9 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "./skeleton"
 
-export const SkeletonSourceItem = React.memo(function SkeletonSourceItem({
+// No React.memo — shown in small loading lists (≤10 items), renders 4 divs.
+// Render cost is negligible; memo overhead not justified without stable parent.
+export function SkeletonSourceItem({
   className
 }: { className?: string }) {
   return (
@@ -14,4 +16,4 @@ export const SkeletonSourceItem = React.memo(function SkeletonSourceItem({
       </div>
     </div>
   )
-})
+}

@@ -2,7 +2,9 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "./skeleton"
 
-export const SkeletonChatMessage = React.memo(function SkeletonChatMessage({
+// No React.memo — only shown during loading states (transient), never in stable lists.
+// Re-render cost of 3 skeleton divs is negligible; memo overhead would exceed render cost.
+export function SkeletonChatMessage({
   isUser,
   className
 }: { isUser?: boolean, className?: string }) {
@@ -16,4 +18,4 @@ export const SkeletonChatMessage = React.memo(function SkeletonChatMessage({
       </div>
     </div>
   )
-})
+}

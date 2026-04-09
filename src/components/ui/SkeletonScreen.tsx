@@ -2,7 +2,9 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "./skeleton"
 
-export const SkeletonScreen = React.memo(function SkeletonScreen({
+// No React.memo — used as a full-page loading state; rendered once then unmounted.
+// No benefit from memoization here.
+export function SkeletonScreen({
   className
 }: { className?: string }) {
   return (
@@ -15,4 +17,4 @@ export const SkeletonScreen = React.memo(function SkeletonScreen({
       </div>
     </div>
   )
-})
+}

@@ -14,7 +14,9 @@ export interface EmptyStateProps {
   className?: string;
 }
 
-export const EmptyState = React.memo(function EmptyState({
+// No React.memo — receives `icon` (ReactNode) and `action` (inline object) which
+// are always new references each render, making memo's shallowEqual check always fail.
+export function EmptyState({
   icon,
   title,
   description,
@@ -44,4 +46,4 @@ export const EmptyState = React.memo(function EmptyState({
       )}
     </div>
   )
-})
+}

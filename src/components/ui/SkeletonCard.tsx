@@ -2,7 +2,9 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "./skeleton"
 
-export const SkeletonCard = React.memo(function SkeletonCard({
+// No React.memo — skeleton cards are ephemeral loading placeholders, never in stable lists.
+// Render cost (handful of divs) is cheaper than memo's shallowEqual comparison.
+export function SkeletonCard({
   className
 }: { className?: string }) {
   return (
@@ -19,4 +21,4 @@ export const SkeletonCard = React.memo(function SkeletonCard({
       </div>
     </div>
   )
-})
+}
