@@ -1,4 +1,3 @@
-
 import React, { Suspense } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, MessageCircle, NotebookPen, Activity, Loader2 } from 'lucide-react';
@@ -7,8 +6,8 @@ import SourcesSidebar from './SourcesSidebar';
 import ChatArea from './ChatArea';
 import StudioSidebar from './StudioSidebar';
 import { Citation } from '@/types/message';
-
-const ActivityPanel = React.lazy(() => import('./ActivityPanel'));
+// [perf] Shared lazy instance — same chunk as StudioSidebar's ActivityPanel
+import { LazyActivityPanel } from './lazy-components';
 
 interface MobileNotebookTabsProps {
   hasSource: boolean;
@@ -121,7 +120,7 @@ const MobileNotebookTabs = ({
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           }>
-            <ActivityPanel notebookId={notebookId} />
+            <LazyActivityPanel notebookId={notebookId} />
           </Suspense>
         </TabsContent>
       )}

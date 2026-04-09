@@ -1,4 +1,5 @@
 import React, { Suspense, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { ArrowLeft, LogOut, User, Users, Workflow } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,8 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import PermissionBadge from './PermissionBadge';
 import CollaborationErrorBoundary from './CollaborationErrorBoundary';
 
-const MemberPanel = React.lazy(() => import('./MemberPanel'));
+// [perf] Shared lazy instance from registry
+import { LazyMemberPanel } from './lazy-components';
 
 interface NotebookHeaderProps {
   title: string;
@@ -178,8 +180,14 @@ const NotebookHeader = ({
 
             {isMemberPanelOpen && notebookId && (
               <CollaborationErrorBoundary>
-                <Suspense fallback={null}>
-                  <MemberPanel
+                {/* [perf] fallback renders a centred spinner so the panel open
+                    feels instant rather than silently broken during chunk load */}
+                <Suspense fallback={
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                }>
+                  <LazyMemberPanel
                     notebookId={notebookId}
                     notebookOwnerId={notebookOwnerId}
                     isOpen={isMemberPanelOpen}

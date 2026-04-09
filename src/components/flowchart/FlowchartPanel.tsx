@@ -116,7 +116,9 @@ export const FlowchartPanel = memo(function FlowchartPanel({
     }
   }, [exportPng, toast]);
 
-  const handleSave = async () => {
+  // [perf] useCallback keeps handleSave reference stable so FlowchartToolbar
+  // (which receives onSave) doesn't bypass its memo optimization every render.
+  const handleSave = useCallback(async () => {
     if (!flowchartData || saveDisabledReason) {
       return;
     }
@@ -132,7 +134,7 @@ export const FlowchartPanel = memo(function FlowchartPanel({
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [flowchartData, saveDisabledReason, onSave, mermaidCode, title, summary]);
 
   if (!flowchartData) {
     return (
@@ -160,6 +162,28 @@ export const FlowchartPanel = memo(function FlowchartPanel({
     );
   }
 
+  // [perf] Stable commit handlers — extracted so FlowchartHeader (memo) keeps
+  // its optimisation instead of re-rendering on every FlowchartPanel render.
+  const handleTitleCommit = useCallback(() => {
+    setTitle((currentTitle) => currentTitle.trim() || 'Quy trình chưa đặt tên');
+  }, []);
+
+  const handleSummaryCommit = useCallback(() => {
+    setSummary((currentSummary) => currentSummary.trim());
+  }, []);
+
+  const handleToggleEditor = useCallback(() => {
+    setIsEditorVisible((prev) => !prev);
+  }, []);
+
+  const handleOpenFullscreen = useCallback(() => {
+    setIsFullscreenOpen(true);
+  }, []);
+
+  const handleCloseFullscreen = useCallback(() => {
+    setIsFullscreenOpen(false);
+  }, []);
+
   return (
     <div className="relative flex h-full flex-col overflow-hidden border-l border-border bg-muted/30 shadow-sm">
       <FlowchartHeader
@@ -168,8 +192,8 @@ export const FlowchartPanel = memo(function FlowchartPanel({
         sourceName={sourceName}
         onTitleChange={setTitle}
         onSummaryChange={setSummary}
-        onTitleCommit={() => setTitle((currentTitle) => currentTitle.trim() || 'Quy trình chưa đặt tên')}
-        onSummaryCommit={() => setSummary((currentSummary) => currentSummary.trim())}
+        onTitleCommit={handleTitleCommit}
+        onSummaryCommit={handleSummaryCommit}
         onClose={onClose}
       />
 
@@ -180,7 +204,7 @@ export const FlowchartPanel = memo(function FlowchartPanel({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => setIsEditorVisible((prev) => !prev)}
+            onClick={handleToggleEditor}
             aria-label={isEditorVisible ? 'Ẩn editor Mermaid' : 'Hiện editor Mermaid'}
             title={isEditorVisible ? 'Ẩn editor Mermaid' : 'Hiện editor Mermaid'}
             className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
@@ -212,7 +236,7 @@ export const FlowchartPanel = memo(function FlowchartPanel({
             <FlowchartPreview
               mermaidCode={debouncedCode}
               isGenerating={isGenerating}
-              onFullscreen={() => setIsFullscreenOpen(true)}
+              onFullscreen={handleOpenFullscreen}
             />
           </div>
         </div>
@@ -239,7 +263,7 @@ export const FlowchartPanel = memo(function FlowchartPanel({
         mermaidCode={debouncedCode}
         title={title}
         isOpen={isFullscreenOpen}
-        onClose={() => setIsFullscreenOpen(false)}
+        onClose={handleCloseFullscreen}
       />
     </div>
   );

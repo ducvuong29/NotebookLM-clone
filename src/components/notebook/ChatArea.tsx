@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, Upload, FileText, Loader2, RefreshCw, AlertCircle, RotateCcw } from 'lucide-react';
@@ -8,7 +8,8 @@ import { useChatMessages } from '@/hooks/useChatMessages';
 import { useSources } from '@/hooks/useSources';
 import MarkdownRenderer from '@/components/chat/MarkdownRenderer';
 import SaveToNoteButton from './SaveToNoteButton';
-import AddSourcesDialog from './AddSourcesDialog';
+import { Suspense } from 'react';
+import { LazyAddSourcesDialog } from './lazy-components';
 import { Citation } from '@/types/message';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonChatMessage } from '@/components/ui/SkeletonChatMessage';
@@ -113,7 +114,9 @@ const ChatArea = ({
 
 
   // Network reconnect: no auto-retry — user clicks the "Thử lại" button manually
-  const handleSendMessage = async (messageText?: string) => {
+  // [perf] useCallback stabilizes handler refs so React.memo on ChatArea
+  // can short-circuit re-renders when Notebook.tsx state changes unrelated to chat.
+  const handleSendMessage = useCallback(async (messageText?: string) => {
     const textToSend = messageText || message.trim();
     if (textToSend && notebookId) {
       try {
@@ -134,17 +137,21 @@ const ChatArea = ({
         setChatError('Oops! Chưa lấy được câu trả lời. Thử lại nhé 😊');
       }
     }
-  };
+  }, [message, notebookId, sendMessageAsync]);
   handleSendMessageRef.current = handleSendMessage;
-  const handleRetry = () => {
+
+  // handleRetry reads lastFailedMessageRef (a ref, not state) — uses ref to call
+  // handleSendMessage so dep array stays empty and ref is always up-to-date
+  const handleRetry = useCallback(() => {
     if (lastFailedMessageRef.current) {
       setChatError(null);
       setShowTimeout(false);
       setShowAiLoading(false);
-      handleSendMessage(lastFailedMessageRef.current);
+      handleSendMessageRef.current(lastFailedMessageRef.current);
     }
-  };
-  const handleRefreshChat = () => {
+  }, []);
+
+  const handleRefreshChat = useCallback(() => {
     if (notebookId) {
       deleteChatHistory(notebookId);
       setClickedQuestions(new Set());
@@ -152,16 +159,18 @@ const ChatArea = ({
       setShowTimeout(false);
       lastFailedMessageRef.current = null;
     }
-  };
-  const handleCitationClick = (citation: Citation) => {
+  }, [notebookId, deleteChatHistory]);
+
+  const handleCitationClick = useCallback((citation: Citation) => {
     onCitationClick?.(citation);
-  };
-  const handleExampleQuestionClick = (question: string) => {
-    // Add question to clicked set to remove it from display
+  }, [onCitationClick]);
+
+  // Uses handleSendMessageRef so dep array stays empty — avoids recreating on every message change
+  const handleExampleQuestionClick = useCallback((question: string) => {
     setClickedQuestions(prev => new Set(prev).add(question));
     setMessage(question);
-    handleSendMessage(question);
-  };
+    handleSendMessageRef.current(question);
+  }, []);
 
   // [perf] Helper functions REMOVED — isUser/isAi are derived once inside .map() below
   // (previously called 3 times per message, causing 60+ redundant property accesses per render)
@@ -355,9 +364,18 @@ const ChatArea = ({
         <p className="text-center text-sm text-muted-foreground">InsightsLM có thể không chính xác; vui lòng kiểm tra lại câu trả lời.</p>
       </div>
       
-      {/* Add Sources Dialog */}
-      <AddSourcesDialog open={showAddSourcesDialog} onOpenChange={setShowAddSourcesDialog} notebookId={notebookId} />
+      {/* [perf] AddSourcesDialog lazy-loaded — 17.8KB chunk, only on first "Tải nguồn lên" click */}
+      <Suspense fallback={null}>
+        <LazyAddSourcesDialog
+          open={showAddSourcesDialog}
+          onOpenChange={setShowAddSourcesDialog}
+          notebookId={notebookId}
+        />
+      </Suspense>
     </div>;
 };
 
-export default ChatArea;
+// [perf] React.memo prevents ChatArea from re-rendering when Notebook.tsx
+// re-renders due to unrelated state changes (e.g., sidebar toggle, showFlowchart).
+// Works in conjunction with useCallback handlers passed from Notebook.tsx.
+export default React.memo(ChatArea);

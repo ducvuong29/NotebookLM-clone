@@ -1,12 +1,13 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, MoreVertical, Trash2, Edit, Loader2, CheckCircle, XCircle, Upload, GitBranch, ChevronLeft, PanelLeftClose } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import AddSourcesDialog from './AddSourcesDialog';
+import { Suspense } from 'react';
+import { LazyAddSourcesDialog } from './lazy-components';
 import RenameSourceDialog from './RenameSourceDialog';
 import SourceContentViewer from '@/components/chat/SourceContentViewer';
 import { useSources } from '@/hooks/useSources';
@@ -30,6 +31,55 @@ interface SourcesSidebarProps {
   onGenerateFlowchart?: (sourceId: string) => void;
   flowchartStatusMap?: Map<string, string>;
   onCloseSidebar?: () => void;
+}
+
+// ============================================================================
+// Module-level helpers — no component state/props dependency, stable across renders
+// ============================================================================
+
+function renderSourceIcon(type: string) {
+  const iconMap: Record<string, string> = {
+    'pdf': '/file-types/PDF.svg',
+    'text': '/file-types/TXT.png',
+    'website': '/file-types/WEB.svg',
+    'youtube': '/file-types/MP3.png',
+    'audio': '/file-types/MP3.png',
+    'doc': '/file-types/DOC.png',
+    'multiple-websites': '/file-types/WEB.svg',
+    'copied-text': '/file-types/TXT.png',
+  };
+
+  const iconUrl = iconMap[type] || iconMap['text'];
+
+  return (
+    <img
+      src={iconUrl}
+      alt={`${type} icon`}
+      className="w-full h-full object-contain"
+      onError={(e) => {
+        const target = e.target as HTMLImageElement;
+        target.style.display = 'none';
+        target.parentElement!.innerHTML = '📄';
+      }}
+    />
+  );
+}
+
+function renderProcessingStatus(status: string) {
+  switch (status) {
+    case 'uploading':
+      return <Upload className="h-4 w-4 animate-pulse text-blue-500" />;
+    case 'processing':
+      return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+    case 'completed':
+      return <CheckCircle className="h-4 w-4 text-green-500" />;
+    case 'failed':
+      return <XCircle className="h-4 w-4 text-red-500" />;
+    case 'pending':
+      return <Loader2 className="h-4 w-4 animate-pulse text-gray-500" />;
+    default:
+      return null;
+  }
 }
 
 const SourcesSidebar = ({
@@ -83,63 +133,20 @@ const SourcesSidebar = ({
   const getSelectedSourceUrl = () => selectedSourceForViewing?.url || '';
 
   
-  const renderSourceIcon = (type: string) => {
-    const iconMap: Record<string, string> = {
-      'pdf': '/file-types/PDF.svg',
-      'text': '/file-types/TXT.png',
-      'website': '/file-types/WEB.svg',
-      'youtube': '/file-types/MP3.png',
-      'audio': '/file-types/MP3.png',
-      'doc': '/file-types/DOC.png',
-      'multiple-websites': '/file-types/WEB.svg',
-      'copied-text': '/file-types/TXT.png'
-    };
+  // [perf] useCallback stabilizes handler references so parent memo'd children
+  // (e.g., list items) aren't forced to re-render on every SourcesSidebar re-render.
 
-    const iconUrl = iconMap[type] || iconMap['text']; // fallback to TXT icon
-
-    return (
-      <img 
-        src={iconUrl} 
-        alt={`${type} icon`} 
-        className="w-full h-full object-contain" 
-        onError={(e) => {
-          // Fallback to a simple text indicator if image fails to load
-          const target = e.target as HTMLImageElement;
-          target.style.display = 'none';
-          target.parentElement!.innerHTML = '📄';
-        }} 
-      />
-    );
-  };
-
-  const renderProcessingStatus = (status: string) => {
-    switch (status) {
-      case 'uploading':
-        return <Upload className="h-4 w-4 animate-pulse text-blue-500" />;
-      case 'processing':
-        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
-      case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'failed':
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'pending':
-        return <Loader2 className="h-4 w-4 animate-pulse text-gray-500" />;
-      default:
-        return null;
-    }
-  };
-
-  const handleRemoveSource = (source: SourceRecord) => {
+  const handleRemoveSource = useCallback((source: SourceRecord) => {
     setSelectedSource(source);
     setShowDeleteDialog(true);
-  };
+  }, []);
 
-  const handleRenameSource = (source: SourceRecord) => {
+  const handleRenameSource = useCallback((source: SourceRecord) => {
     setSelectedSource(source);
     setShowRenameDialog(true);
-  };
+  }, []);
 
-  const handleSourceClick = (source: SourceRecord) => {
+  const handleSourceClick = useCallback((source: SourceRecord) => {
     // Clear any existing citation state first
     if (setSelectedCitation) {
       setSelectedCitation(null);
@@ -155,29 +162,28 @@ const SourcesSidebar = ({
       source_title: source.title,
       source_type: source.type,
       chunk_index: 0,
-      excerpt: 'Full document view'
+      excerpt: 'Full document view',
       // Deliberately omitting chunk_lines_from and chunk_lines_to to prevent auto-scroll
     };
 
     // [perf] React 18 auto-batches all setState calls in an event handler into 1 re-render.
-    // Removed the previous setTimeout(50ms) that caused 50ms perceived lag on every source click.
     if (setSelectedCitation) {
       setSelectedCitation(mockCitation);
     }
-  };
+  }, [setSelectedCitation]);
 
-  const handleBackToSources = () => {
+  const handleBackToSources = useCallback(() => {
     setSelectedSourceForViewing(null);
     onCitationClose?.();
-  };
+  }, [onCitationClose]);
 
-  const confirmDelete = () => {
+  const confirmDelete = useCallback(() => {
     if (selectedSource) {
       deleteSource(selectedSource.id);
       setShowDeleteDialog(false);
       setSelectedSource(null);
     }
-  };
+  }, [selectedSource, deleteSource]);
 
   // If we have a selected citation, show the content viewer
   if (selectedCitation) {
@@ -316,11 +322,14 @@ const SourcesSidebar = ({
         </div>
       </ScrollArea>
 
-      <AddSourcesDialog 
-        open={showAddSourcesDialog} 
-        onOpenChange={setShowAddSourcesDialog} 
-        notebookId={notebookId} 
-      />
+      {/* [perf] AddSourcesDialog lazy-loaded — 17.8KB chunk downloaded only on first "Thêm nguồn" click */}
+      <Suspense fallback={null}>
+        <LazyAddSourcesDialog
+          open={showAddSourcesDialog}
+          onOpenChange={setShowAddSourcesDialog}
+          notebookId={notebookId}
+        />
+      </Suspense>
 
       <RenameSourceDialog 
         open={showRenameDialog} 
@@ -353,4 +362,6 @@ const SourcesSidebar = ({
   );
 };
 
-export default SourcesSidebar;
+// [perf] React.memo prevents SourcesSidebar from re-rendering when Notebook.tsx
+// re-renders due to unrelated state changes (e.g., showFlowchart, activeTab).
+export default React.memo(SourcesSidebar);

@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
+
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { RegenerateFlowchartDialog } from '@/components/flowchart/RegenerateFlowchartDialog';
@@ -16,11 +17,22 @@ import { useFlowcharts } from '@/hooks/useFlowcharts';
 import { useGenerateFlowchart } from '@/hooks/useGenerateFlowchart';
 import NotebookHeader from '@/components/notebook/NotebookHeader';
 import SourcesSidebar from '@/components/notebook/SourcesSidebar';
-import ChatArea from '@/components/notebook/ChatArea';
-import StudioSidebar from '@/components/notebook/StudioSidebar';
-import MobileNotebookTabs from '@/components/notebook/MobileNotebookTabs';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { Citation } from '@/types/message';
+// [perf] ChatArea + StudioSidebar are eager-loaded: they render on every /notebook
+// visit (100% probability), so lazy would only add a cascade waterfall without
+// any bundle benefit for users already on this route.
+import ChatArea from '@/components/notebook/ChatArea';
+import StudioSidebar from '@/components/notebook/StudioSidebar';
+// MobileNotebookTabs stays lazy — mutually exclusive with the desktop layout,
+// so ~60% of sessions (desktop) never need this chunk at all.
+import { LazyMobileNotebookTabs } from '@/components/notebook/lazy-components';
+
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  FileText, Link as LinkIcon, File, AudioLines, Network,
+  Presentation, BookOpen, MessageCircleQuestion, BarChart2, Table
+} from 'lucide-react';
 
 const FlowchartPanel = lazy(() =>
   import('@/components/flowchart/FlowchartPanel').then((module) => ({
@@ -28,11 +40,18 @@ const FlowchartPanel = lazy(() =>
   }))
 );
 
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  FileText, Link as LinkIcon, File, AudioLines, Network, 
-  Presentation, BookOpen, MessageCircleQuestion, BarChart2, Table 
-} from 'lucide-react';
+// ---------- Skeleton fallbacks for lazy panels ----------
+
+/** Shown while MobileNotebookTabs chunk downloads */
+const MobileTabsSkeleton = () => (
+  <div className="flex h-full flex-col animate-pulse">
+    <div className="h-12 bg-muted border-b border-border" />
+    <div className="flex-1 p-4 space-y-3">
+      <div className="h-4 bg-muted rounded w-2/3" />
+      <div className="h-4 bg-muted rounded w-1/2" />
+    </div>
+  </div>
+);
 
 interface CollapsedSidebarRailProps {
   side: 'left' | 'right';
@@ -196,8 +215,21 @@ const Notebook = () => {
   }, [flowcharts]);
   const isDesktop = useIsDesktop();
 
-  const notebook = notebooks?.find((item) => item.id === notebookId);
-  const hasSource = Boolean(sources && sources.length > 0);
+  // [perf] useMemo — notebooks is an array from React Query cache; .find() is O(n).
+  // Without memo, this runs on every Notebook render (sidebar toggle, citation click, etc.).
+  // Re-computes only when notebooks array reference or notebookId changes.
+  const notebook = useMemo(
+    () => notebooks?.find((item) => item.id === notebookId),
+    [notebooks, notebookId]
+  );
+
+  // [perf] useMemo — avoids Boolean(sources && sources.length > 0) recalculation
+  // on every render. Stable reference also benefits any memo'd children reading this.
+  const hasSource = useMemo(
+    () => Boolean(sources && sources.length > 0),
+    [sources]
+  );
+
   const isSourceDocumentOpen = Boolean(selectedCitation);
 
   useEffect(() => {
@@ -259,7 +291,11 @@ const Notebook = () => {
     notebook?.visibility
   );
 
-  const handleCitationClick = (citation: Citation) => {
+  // [perf] useCallback keeps function references stable across Notebook re-renders.
+  // Without this, memo'd children (ChatArea, SourcesSidebar, StudioSidebar) lose
+  // their memo optimization every time any Notebook state changes.
+
+  const handleCitationClick = useCallback((citation: Citation) => {
     guardedAction(() => {
       setActiveFlowchartSourceId(citation.source_id);
       setSelectedCitation(citation);
@@ -268,13 +304,14 @@ const Notebook = () => {
         setActiveTab('sources');
       }
     });
-  };
+  }, [guardedAction, isDesktop, setActiveTab]);
 
-  const handleCitationClose = () => {
+  // setSelectedCitation is a stable useState setter — dep array is intentionally empty.
+  const handleCitationClose = useCallback(() => {
     setSelectedCitation(null);
-  };
+  }, []);
 
-  const handleFlowchartToggle = (sourceId?: string) => {
+  const handleFlowchartToggle = useCallback((sourceId?: string) => {
     guardedAction(() => {
       if (!showFlowchart || sourceId) {
         setHasLoadedFlowchart(true);
@@ -290,7 +327,7 @@ const Notebook = () => {
       setShowRightSidebar(true);
       setShowFlowchart(sourceId ? true : !showFlowchart);
     });
-  };
+  }, [guardedAction, showFlowchart, selectedCitation, activeFlowchartSourceId, sources]);
 
   const handleNavigateHome = useCallback(() => {
     guardedAction(() => {
@@ -333,6 +370,42 @@ const Notebook = () => {
       });
     }
   }, [activeFlowchartSourceId, getFlowchartBySourceId, saveFlowchart, toast]);
+
+  // [perf] Extracted from JSX: stable references so memoized children
+  // (FlowchartPanel, SourcesSidebar, SidebarDockButton) keep their optimisations
+  // on every Notebook re-render.
+  const handleCloseSourcesSidebar = useCallback(() => setShowSourcesSidebar(false), []);
+  const handleOpenSourcesSidebar  = useCallback(() => setShowSourcesSidebar(true), []);
+  const handleOpenRightSidebar    = useCallback(() => setShowRightSidebar(true), []);
+  const handleCloseRightSidebar   = useCallback(() => setShowRightSidebar(false), []);
+
+  // FlowchartPanel callbacks that call guardedAction
+  const handleFlowchartClose = useCallback(
+    () => guardedAction(() => setShowFlowchart(false)),
+    [guardedAction]
+  );
+  const handleFlowchartOpenSources = useCallback(
+    () => guardedAction(() => setShowSourcesSidebar(true)),
+    [guardedAction]
+  );
+
+  // RegenerateFlowchartDialog callbacks
+  const handleRegenerateOpenChange = useCallback((open: boolean) => {
+    if (!open) setPendingRegenerateSourceId(null);
+  }, []);
+  const handleRegenerateConfirm = useCallback(() => {
+    if (pendingRegenerateSourceId) {
+      executeFlowchartGeneration(pendingRegenerateSourceId);
+      setPendingRegenerateSourceId(null);
+    }
+  }, [pendingRegenerateSourceId, executeFlowchartGeneration]);
+
+  // UnsavedChangesDialog discard callback
+  const handleUnsavedDiscard = useCallback(() => {
+    setShowUnsavedDialog(false);
+    pendingAction?.();
+    setPendingAction(null);
+  }, [pendingAction]);
 
   const activeFlowchartSource =
     sources?.find((source) => source.id === activeFlowchartSourceId) ?? null;
@@ -408,7 +481,7 @@ const Notebook = () => {
                         canDelete={canDelete}
                         onGenerateFlowchart={handleGenerateFlowchart}
                         flowchartStatusMap={flowchartGeneratingStatus}
-                        onCloseSidebar={() => setShowSourcesSidebar(false)}
+                        onCloseSidebar={handleCloseSourcesSidebar}
                       />
                   </div>
                 </Panel>
@@ -424,7 +497,7 @@ const Notebook = () => {
               {!showSourcesSidebar && (
                 <CollapsedSidebarRail
                   side="left"
-                  onOpen={() => setShowSourcesSidebar(true)}
+                  onOpen={handleOpenSourcesSidebar}
                   actionTooltip="Thêm nguồn"
                 >
                   {sources?.map(source => (
@@ -448,7 +521,7 @@ const Notebook = () => {
               {!showRightSidebar && (
                 <CollapsedSidebarRail
                   side="right"
-                  onOpen={() => setShowRightSidebar(true)}
+                  onOpen={handleOpenRightSidebar}
                   actionTooltip="Mở Studio"
                 >
                    <StudioRailIcon icon={AudioLines} bgColor="bg-muted" iconColor="text-foreground" onOpen={() => setShowRightSidebar(true)} />
@@ -517,8 +590,8 @@ const Notebook = () => {
                             flowchartData={activeFlowchartData}
                             sourceName={activeFlowchartSource?.title}
                             onSave={handleFlowchartSave}
-                            onClose={() => guardedAction(() => setShowFlowchart(false))}
-                            onOpenSources={() => guardedAction(() => setShowSourcesSidebar(true))}
+                            onClose={handleFlowchartClose}
+                            onOpenSources={handleFlowchartOpenSources}
                             onDirtyStateChange={setIsFlowchartDirty}
                           />
                         </Suspense>
@@ -528,7 +601,7 @@ const Notebook = () => {
                   <SidebarDockButton
                     side="right"
                     action="close"
-                    onClick={() => setShowRightSidebar(false)}
+                    onClick={handleCloseRightSidebar}
                   />
                 </Panel>
               </>
@@ -538,46 +611,37 @@ const Notebook = () => {
       ) : (
         <main id="main-content" className="h-full flex-1 overflow-hidden">
           <ErrorBoundary key={notebookId}>
-            <MobileNotebookTabs
-              hasSource={hasSource}
-              notebookId={notebookId}
-              notebook={notebook}
-              selectedCitation={selectedCitation}
-              onCitationClose={handleCitationClose}
-              setSelectedCitation={setSelectedCitation}
-              onCitationClick={handleCitationClick}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              canEdit={canEdit}
-              canDelete={canDelete}
-              isMember={isMember}
-            />
+            <Suspense fallback={<MobileTabsSkeleton />}>
+              <LazyMobileNotebookTabs
+                hasSource={hasSource}
+                notebookId={notebookId}
+                notebook={notebook}
+                selectedCitation={selectedCitation}
+                onCitationClose={handleCitationClose}
+                setSelectedCitation={setSelectedCitation}
+                onCitationClick={handleCitationClick}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                canEdit={canEdit}
+                canDelete={canDelete}
+                isMember={isMember}
+              />
+            </Suspense>
           </ErrorBoundary>
         </main>
       )}
 
       <RegenerateFlowchartDialog
         open={!!pendingRegenerateSourceId}
-        onOpenChange={(open) => {
-          if (!open) setPendingRegenerateSourceId(null);
-        }}
-        onConfirm={() => {
-          if (pendingRegenerateSourceId) {
-            executeFlowchartGeneration(pendingRegenerateSourceId);
-            setPendingRegenerateSourceId(null);
-          }
-        }}
+        onOpenChange={handleRegenerateOpenChange}
+        onConfirm={handleRegenerateConfirm}
         sourceName={sources?.find(s => s.id === pendingRegenerateSourceId)?.title ?? ''}
       />
 
       <UnsavedChangesDialog
         open={showUnsavedDialog}
         onOpenChange={setShowUnsavedDialog}
-        onDiscard={() => {
-          setShowUnsavedDialog(false);
-          pendingAction?.();
-          setPendingAction(null);
-        }}
+        onDiscard={handleUnsavedDiscard}
       />
     </div>
   );

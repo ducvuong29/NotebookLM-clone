@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -14,8 +14,8 @@ import NoteEditor from './NoteEditor';
 import AudioPlayer from './AudioPlayer';
 import { Citation } from '@/types/message';
 
-// Lazy-load ActivityPanel — only downloaded when user opens it
-const ActivityPanel = lazy(() => import('./ActivityPanel'));
+// [perf] Use shared lazy instance — prevents duplicate chunks across desktop/mobile layouts
+import { LazyActivityPanel } from './lazy-components';
 
 interface StudioSidebarProps {
   notebookId?: string;
@@ -77,10 +77,21 @@ const StudioSidebar = ({
     return () => clearInterval(interval);
   }, [notebookId, notebook?.audio_overview_url, notebook?.audio_url_expires_at, autoRefreshIfExpired]);
 
-  const handleCreateNote = () => { setIsCreatingNote(true); setEditingNote(null); };
-  const handleEditNote = (note: Note) => { setEditingNote(note); setIsCreatingNote(false); };
-  
-  const handleSaveNote = (title: string, content: string) => {
+  // [perf] useCallback stabilizes all handler references so child components
+  // (NoteEditor, AudioPlayer, etc.) wrapped in React.memo don't re-render
+  // when unrelated StudioSidebar state changes (e.g., accordion open state).
+
+  const handleCreateNote = useCallback(() => {
+    setIsCreatingNote(true);
+    setEditingNote(null);
+  }, []);
+
+  const handleEditNote = useCallback((note: Note) => {
+    setEditingNote(note);
+    setIsCreatingNote(false);
+  }, []);
+
+  const handleSaveNote = useCallback((title: string, content: string) => {
     if (editingNote) {
       if (editingNote.source_type === 'user') {
         updateNote({ id: editingNote.id, title, content });
@@ -90,18 +101,48 @@ const StudioSidebar = ({
     }
     setEditingNote(null);
     setIsCreatingNote(false);
-  };
+  }, [editingNote, updateNote, createNote]);
 
-  const handleDeleteNote = () => {
-    if (editingNote) { deleteNote(editingNote.id); setEditingNote(null); }
-  };
+  const handleDeleteNote = useCallback(() => {
+    if (editingNote) {
+      deleteNote(editingNote.id);
+      setEditingNote(null);
+    }
+  }, [editingNote, deleteNote]);
 
-  const handleCancel = () => { setEditingNote(null); setIsCreatingNote(false); };
-  const handleGenerateAudio = () => { if (notebookId) { generateAudioOverview(notebookId); setAudioError(false); } };
-  const handleAudioError = () => { setAudioError(true); };
-  const handleAudioRetry = () => { handleGenerateAudio(); };
-  const handleAudioDeleted = () => { if (notebookId) { queryClient.invalidateQueries({ queryKey: ['notebooks'] }); } setAudioError(false); };
-  const handleUrlRefresh = (notebookId: string) => { refreshAudioUrl(notebookId); };
+  const handleCancel = useCallback(() => {
+    setEditingNote(null);
+    setIsCreatingNote(false);
+  }, []);
+
+  // handleGenerateAudio MUST be declared before handleAudioRetry (dep ordering)
+  const handleGenerateAudio = useCallback(() => {
+    if (notebookId) {
+      generateAudioOverview(notebookId);
+      setAudioError(false);
+    }
+  }, [notebookId, generateAudioOverview]);
+
+  const handleAudioError = useCallback(() => {
+    setAudioError(true);
+  }, []);
+
+  const handleAudioRetry = useCallback(() => {
+    handleGenerateAudio();
+  }, [handleGenerateAudio]);
+
+  const handleAudioDeleted = useCallback(() => {
+    if (notebookId) {
+      queryClient.invalidateQueries({ queryKey: ['notebooks'] });
+    }
+    setAudioError(false);
+  }, [notebookId, queryClient]);
+
+  // Note: parameter `notebookId` intentionally shadows the outer prop
+  // to allow the caller to pass a specific notebookId for URL refresh.
+  const handleUrlRefresh = useCallback((notebookId: string) => {
+    refreshAudioUrl(notebookId);
+  }, [refreshAudioUrl]);
 
   const getStatusDisplay = () => {
     if (isAutoRefreshing) return { icon: null, text: "Đang làm mới URL...", description: "Đang cập nhật quyền truy cập âm thanh" };
@@ -346,7 +387,7 @@ const StudioSidebar = ({
                 <div className="p-0 border-t border-border/50 max-h-[300px] overflow-y-auto custom-scrollbar">
                   {hasLoadedActivity && (
                     <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>}>
-                      <ActivityPanel notebookId={notebookId} />
+                      <LazyActivityPanel notebookId={notebookId} />
                     </Suspense>
                   )}
                 </div>
@@ -360,4 +401,8 @@ const StudioSidebar = ({
   );
 };
 
-export default StudioSidebar;
+// [perf] React.memo prevents StudioSidebar from re-rendering when Notebook.tsx
+// re-renders due to unrelated state changes (e.g., FlowchartPanel toggle, tabs).
+// NOTE: Full benefit requires onCitationClick / onOpenFlowchart from Notebook.tsx
+// to also be wrapped in useCallback (issue #2 in perf audit).
+export default React.memo(StudioSidebar);

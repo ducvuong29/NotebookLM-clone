@@ -157,7 +157,10 @@ function groupByDay(entries: ActivityLogEntry[]): DayGroup[] {
 // Sub-components
 // ============================================================================
 
-function ActivityItem({ entry, index }: { entry: ActivityLogEntry; index: number }) {
+// [perf] React.memo prevents each ActivityItem from re-rendering when the parent
+// ActivityPanel re-renders (e.g., new entries arrive, accordion toggle).
+// Each item only re-renders when its own `entry` or `index` prop changes.
+const ActivityItem = React.memo(function ActivityItem({ entry, index }: { entry: ActivityLogEntry; index: number }) {
   const config = getActionConfig(entry.action_type);
   const Icon = config.icon;
   
@@ -199,7 +202,7 @@ function ActivityItem({ entry, index }: { entry: ActivityLogEntry; index: number
       </div>
     </div>
   );
-}
+});
 
 function ActivitySkeleton() {
   return (
