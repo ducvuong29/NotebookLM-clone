@@ -16,6 +16,25 @@ export const useFileUpload = () => {
     setUploadStatus('idle');
   }, []);
 
+  // Ensure correct MIME type — browser file.type can be empty/wrong on some OS/browser combos.
+  // n8n's Switch node routes based on the Content-Type header returned by Supabase Storage.
+  // DOCX is NOT listed — it is blocked at the upload validation layer (AddSourcesDialog).
+  const getMimeType = (file: File): string => {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const mimeMap: Record<string, string> = {
+      'pdf':  'application/pdf',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'xls':  'application/vnd.ms-excel',
+      'csv':  'text/csv',
+      'txt':  'text/plain',
+      'mp3':  'audio/mpeg',
+      'mp4':  'audio/mp4',
+      'm4a':  'audio/mp4',
+      'wav':  'audio/wav',
+    };
+    return mimeMap[ext ?? ''] || file.type || 'application/octet-stream';
+  };
+
   const uploadFile = async (file: File, notebookId: string, sourceId: string): Promise<string | null> => {
     try {
       setIsUploading(true);
@@ -80,6 +99,10 @@ export const useFileUpload = () => {
         xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
         xhr.setRequestHeader('x-upsert', 'false');
         xhr.setRequestHeader('Cache-Control', '3600');
+        // CRITICAL: Set Content-Type so Supabase Storage preserves the correct MIME type.
+        // Without this, Storage saves as 'application/octet-stream' and n8n's Switch node
+        // in the Extract Text workflow cannot route DOCX/XLSX/CSV to the correct parser.
+        xhr.setRequestHeader('Content-Type', getMimeType(file));
         xhr.send(file);
       });
 

@@ -119,17 +119,74 @@ const AddSourcesDialog = ({
 
     if (validFiles.length === 0) return;
 
-    files = validFiles;
+    // Validate file types — reject unsupported formats (Layer 1 defense)
+    // NOTE: Use file extension, NOT file.type — browser MIME can be empty for some file types.
+    // DOCX (.docx) is NOT supported: n8n's extractFromFile does not have a 'docx' operation.
+    const ALLOWED_EXTENSIONS = new Set([
+      'pdf',
+      'txt', 'md',
+      'csv',
+      'xlsx', 'xls',
+      'mp3', 'wav', 'm4a', 'ogg',
+    ]);
+
+    // Human-readable list shown in error toast
+    const ALLOWED_LABEL = 'PDF, Excel (.xlsx/.xls), CSV, TXT, hoặc file âm thanh (MP3/WAV/M4A)';
+
+    const getExt = (file: File) => file.name.split('.').pop()?.toLowerCase() ?? '';
+
+    const unsupportedFiles = validFiles.filter(f => !ALLOWED_EXTENSIONS.has(getExt(f)));
+    const supportedFiles  = validFiles.filter(f =>  ALLOWED_EXTENSIONS.has(getExt(f)));
+
+    unsupportedFiles.forEach(f => {
+      const ext = getExt(f);
+      const isDocx = ext === 'docx' || ext === 'doc';
+      toast({
+        title: isDocx ? 'Word không được hỗ trợ' : 'Định dạng không hỗ trợ',
+        description: isDocx
+          ? `"${f.name}": File Word (.docx/.doc) chưa được hỗ trợ. Vui lòng export sang PDF rồi upload lại.`
+          : `"${f.name}" (.${ext || '?'}) không được hỗ trợ. Định dạng hợp lệ: ${ALLOWED_LABEL}.`,
+        variant: 'destructive',
+      });
+    });
+
+    if (supportedFiles.length === 0) return;
+
+    files = supportedFiles;
     setIsLocallyProcessing(true);
 
     try {
       // Step 1: Create the first source immediately
       const firstFile = files[0];
-      const firstFileType = firstFile.type.includes('pdf') ? 'pdf' : firstFile.type.includes('audio') ? 'audio' : 'text';
+
+      // Type stored in DB — must match source_type enum:
+      // pdf | text | website | youtube | audio | file (added via 20260411100000_add_file_source_type.sql)
+      // IMPORTANT: Use file extension, NOT file.type — browser MIME can be empty for Office files
+      const getDbType = (file: File): 'pdf' | 'text' | 'website' | 'youtube' | 'audio' | 'file' => {
+        const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+        if (ext === 'pdf') return 'pdf';
+        if (['mp3', 'wav', 'm4a', 'ogg', 'mp4'].includes(ext)) return 'audio';
+        if (['xlsx', 'xls', 'csv'].includes(ext)) return 'file'; // docx removed: not supported by n8n
+        return 'text'; // plain .txt / .md
+      };
+
+      // sourceType sent to n8n webhook — controls routing inside the workflow
+      // 'file' → routes to Extract Text sub-workflow (reads binary from Supabase Storage)
+      // 'text' → routes to Copied Text path (reads .content field)
+      // IMPORTANT: Use file extension, NOT file.type — browser MIME can be empty for Office files
+      const getSourceType = (file: File): string => {
+        const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+        if (ext === 'pdf') return 'pdf';
+        if (['mp3', 'wav', 'm4a', 'ogg', 'mp4'].includes(ext)) return 'audio';
+        if (['xlsx', 'xls', 'csv'].includes(ext)) return 'file'; // docx removed: not supported by n8n
+        return 'text'; // plain .txt / .md — no binary parsing needed
+      };
+
+      const firstDbType = getDbType(firstFile);
       const firstSourceData = {
         notebookId,
         title: firstFile.name,
-        type: firstFileType as 'pdf' | 'text' | 'website' | 'youtube' | 'audio',
+        type: firstDbType,
         file_size: firstFile.size,
         processing_status: 'pending',
         metadata: { fileName: firstFile.name, fileType: firstFile.type }
@@ -144,11 +201,10 @@ const AddSourcesDialog = ({
         await new Promise(resolve => setTimeout(resolve, 150));
         
         remainingSources = await Promise.all(files.slice(1).map(async (file) => {
-          const fileType = file.type.includes('pdf') ? 'pdf' : file.type.includes('audio') ? 'audio' : 'text';
           const sourceData = {
             notebookId,
             title: file.name,
-            type: fileType as 'pdf' | 'text' | 'website' | 'youtube' | 'audio',
+            type: getDbType(file),
             file_size: file.size,
             processing_status: 'pending',
             metadata: { fileName: file.name, fileType: file.type }
@@ -188,15 +244,15 @@ const AddSourcesDialog = ({
 
       // Step 5: Process files in background
       const processingPromises = uploadResults.map(({ file, sourceId, filePath }) => {
-        const fileType = file.type.includes('pdf') ? 'pdf' : file.type.includes('audio') ? 'audio' : 'text';
+        const sourceType = getSourceType(file); // 'file' for docx/xlsx/csv → Extract Text sub-workflow
         
         updateSource({
           sourceId,
           updates: { file_path: filePath, processing_status: 'processing' }
         });
 
-        return processDocumentAsync({ sourceId, filePath, sourceType: fileType })
-          .then(() => generateNotebookContentAsync({ notebookId, filePath, sourceType: fileType }))
+        return processDocumentAsync({ sourceId, filePath, sourceType })
+          .then(() => generateNotebookContentAsync({ notebookId, filePath, sourceType }))
           .catch(processingError => {
             updateSource({ sourceId, updates: { processing_status: 'completed' } });
             throw processingError;
@@ -417,14 +473,14 @@ const AddSourcesDialog = ({
                   </p>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Định dạng hỗ trợ: PDF, txt, Markdown, Âm thanh (ví dụ: mp3) · Tối đa 25MB mỗi file
+                  Định dạng hỗ trợ: PDF, Word (.docx), Excel (.xlsx), CSV, txt, Âm thanh (mp3) · Tối đa 25MB mỗi file
                 </p>
                 <input
                   id="file-upload"
                   type="file"
                   multiple
                   className="hidden"
-                  accept=".pdf,.txt,.md,.mp3,.wav,.m4a"
+                  accept=".pdf,.txt,.md,.mp3,.wav,.m4a,.docx,.xlsx,.xls,.csv"
                   onChange={handleFileSelect}
                   disabled={isProcessingFiles}
                 />

@@ -147,7 +147,8 @@ export const useSources = (notebookId?: string) => {
         if (notebook?.generation_status === 'pending') {
           const canGenerate =
             (newSource.type === 'pdf' && newSource.file_path) ||
-            (newSource.type === 'text' && newSource.content) ||
+            (newSource.type === 'file' && newSource.file_path) ||   // docx, xlsx, csv
+            (newSource.type === 'text' && newSource.content) ||     // plain pasted text
             (newSource.type === 'website' && newSource.url) ||
             (newSource.type === 'youtube' && newSource.url) ||
             (newSource.type === 'audio' && newSource.file_path);

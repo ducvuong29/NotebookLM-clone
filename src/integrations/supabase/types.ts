@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -449,7 +449,7 @@ export type Database = {
     }
     Enums: {
       member_role: "owner" | "editor" | "viewer"
-      source_type: "pdf" | "text" | "website" | "youtube" | "audio"
+      source_type: "pdf" | "text" | "website" | "youtube" | "audio" | "file"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -578,7 +578,7 @@ export const Constants = {
   public: {
     Enums: {
       member_role: ["owner", "editor", "viewer"],
-      source_type: ["pdf", "text", "website", "youtube", "audio"],
+      source_type: ["pdf", "text", "website", "youtube", "audio", "file"],
     },
   },
 } as const
