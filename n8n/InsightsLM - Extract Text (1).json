@@ -52,7 +52,8 @@
         "options": {
           "response": {
             "response": {
-              "fullResponse": true
+              "responseFormat": "file",
+              "outputPropertyName": "data"
             }
           }
         }
@@ -73,38 +74,16 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": true,
+                  "caseSensitive": false,
                   "leftValue": "",
                   "typeValidation": "strict",
                   "version": 2
                 },
                 "conditions": [
                   {
-                    "leftValue": "={{ $json.headers[\"content-type\"] }}",
-                    "rightValue": "application/pdf",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    },
-                    "id": "dc0dbe8c-70d5-4127-95f8-0fbd3f1a6bad"
-                  }
-                ],
-                "combinator": "and"
-              }
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
-                },
-                "conditions": [
-                  {
-                    "id": "2307a9d5-7872-49dc-9aeb-60697b91dc84",
-                    "leftValue": "={{ $json.headers[\"content-type\"] }}",
-                    "rightValue": "audio/mpeg",
+                    "id": "dc0dbe8c-70d5-4127-95f8-0fbd3f1a6bad",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.filePath.split('.').pop().toLowerCase() }}",
+                    "rightValue": "pdf",
                     "operator": {
                       "type": "string",
                       "operation": "equals",
@@ -118,7 +97,70 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": true,
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "audio-mp3",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.filePath.split('.').pop().toLowerCase() }}",
+                    "rightValue": "mp3",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  },
+                  {
+                    "id": "audio-wav",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.filePath.split('.').pop().toLowerCase() }}",
+                    "rightValue": "wav",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  },
+                  {
+                    "id": "audio-m4a",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.filePath.split('.').pop().toLowerCase() }}",
+                    "rightValue": "m4a",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  },
+                  {
+                    "id": "audio-ogg",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.filePath.split('.').pop().toLowerCase() }}",
+                    "rightValue": "ogg",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  },
+                  {
+                    "id": "audio-mp4",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.filePath.split('.').pop().toLowerCase() }}",
+                    "rightValue": "mp4",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
                   "leftValue": "",
                   "typeValidation": "strict",
                   "version": 2
@@ -126,8 +168,64 @@
                 "conditions": [
                   {
                     "id": "87532eb7-b821-4d84-9d8e-c17136b0a88a",
-                    "leftValue": "={{ $json.headers[\"content-type\"] }}",
-                    "rightValue": "text/plain",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.filePath.split('.').pop().toLowerCase() }}",
+                    "rightValue": "txt",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "excel-xlsx",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.filePath.split('.').pop().toLowerCase() }}",
+                    "rightValue": "xlsx",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  },
+                  {
+                    "id": "excel-xls",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.filePath.split('.').pop().toLowerCase() }}",
+                    "rightValue": "xls",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c3d4e5f6-3333-4444-5555-666677778888",
+                    "leftValue": "={{ $('When Executed by Another Workflow').item.json.filePath.split('.').pop().toLowerCase() }}",
+                    "rightValue": "csv",
                     "operator": {
                       "type": "string",
                       "operation": "equals",
@@ -167,20 +265,10 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "1f5bee5d-939c-4df3-8e7d-0696ac3aa702",
-              "name": "text",
-              "value": "={{ $('Download File').item.json.data }}",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "// For plain text (.txt/.md) files: decode binary data downloaded by HTTP Request node\n// When responseFormat='file', n8n stores the file in $binary.data as a base64 string\nconst binaryData = $binary?.data;\nif (!binaryData) {\n  return [{ json: { text: '' } }];\n}\n// n8n binary data property: { data (base64 string), mimeType, fileName, fileSize }\nconst text = Buffer.from(binaryData.data, 'base64').toString('utf-8');\nreturn [{ json: { text } }];"
       },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         2512,
         2256
@@ -247,6 +335,60 @@
           "name": "OpenAi account"
         }
       }
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        2512,
+        2640
+      ],
+      "id": "b2c3d4e5-bbbb-cccc-dddd-eeeeffff0000",
+      "name": "Extract from Excel"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert Excel JSON rows → readable text for RAG\n// extractFromFile xlsx outputs: [{col1: val1, col2: val2, ...}, ...]\nconst items = $input.all();\nconst lines = items.map(item => {\n  return Object.entries(item.json)\n    .filter(([k]) => k !== 'row_number')\n    .map(([k, v]) => `${k}: ${v}`)\n    .join(' | ');\n}).filter(line => line.trim().length > 0);\n\nreturn [{ json: { text: lines.join('\\n') } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2736,
+        2640
+      ],
+      "id": "excel-convert-9999-aaaa-bbbb-ccccdddd0001",
+      "name": "Convert Excel to Text"
+    },
+    {
+      "parameters": {
+        "operation": "csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        2512,
+        2832
+      ],
+      "id": "c3d4e5f6-cccc-dddd-eeee-ffff00001111",
+      "name": "Extract from CSV"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert CSV JSON rows → readable text for RAG\n// extractFromFile csv outputs: [{col1: val1, col2: val2, ...}, ...]\nconst items = $input.all();\nconst lines = items.map(item => {\n  return Object.entries(item.json)\n    .map(([k, v]) => `${k}: ${v}`)\n    .join(' | ');\n}).filter(line => line.trim().length > 0);\n\nreturn [{ json: { text: lines.join('\\n') } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2736,
+        2832
+      ],
+      "id": "csv-convert-9999-aaaa-bbbb-ccccdddd0002",
+      "name": "Convert CSV to Text"
     }
   ],
   "pinData": {},
@@ -295,6 +437,20 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Extract from Excel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from CSV",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -332,6 +488,50 @@
       ]
     },
     "Transcribe a recording1": {
+      "main": [
+        [
+          {
+            "node": "Extracted Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from Excel": {
+      "main": [
+        [
+          {
+            "node": "Convert Excel to Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Excel to Text": {
+      "main": [
+        [
+          {
+            "node": "Extracted Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from CSV": {
+      "main": [
+        [
+          {
+            "node": "Convert CSV to Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert CSV to Text": {
       "main": [
         [
           {
