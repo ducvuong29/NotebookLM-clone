@@ -212,29 +212,29 @@ const ChatArea = ({
 
           <ScrollArea className="flex-1 h-full" ref={scrollAreaRef}>
             {/* Document Summary */}
-            <div className="p-8 border-b border-border">
+            <div className="px-5 py-4 border-b border-border">
               <div className="max-w-[1000px] mx-auto">
                 <div className="flex items-center space-x-4 mb-6">
                   <div className="w-10 h-10 flex items-center justify-center bg-transparent">
                     {isGenerating ? <Loader2 className="text-foreground font-normal w-10 h-10 animate-spin" /> : <span className="text-[40px] leading-none">{notebook?.icon || '☕'}</span>}
                   </div>
                   <div>
-                    <h1 className="text-2xl font-medium text-foreground">
+                    <h1 className="text-lg font-medium text-foreground">
                       {isGenerating ? 'Đang tạo nội dung...' : notebook?.title || 'Notebook chưa đặt tên'}
                     </h1>
                     <p className="text-sm text-muted-foreground">{sourceCount} nguồn</p>
                   </div>
                 </div>
                 
-                <div className="bg-muted/50 rounded-lg p-6 mb-6 px-4 py-4 md:px-6 md:py-6">
+                <div className="bg-muted/50 rounded-lg mb-4 px-4 py-3">
                   {isGenerating ? <div className="flex items-center space-x-2 text-muted-foreground">
                       
                       <p>AI đang phân tích nguồn và tạo tiêu đề, mô tả...</p>
-                    </div> : <MarkdownRenderer content={notebook?.description || 'Chưa có mô tả cho notebook này.'} className="prose prose-gray dark:prose-invert max-w-none leading-relaxed" />}
+                    </div> : <MarkdownRenderer content={notebook?.description || 'Chưa có mô tả cho notebook này.'} className="prose prose-gray dark:prose-invert max-w-none text-[13px] leading-snug" />}
                 </div>
 
                 {/* Chat Messages */}
-                {(messages.length > 0 || pendingUserMessage || showAiLoading) && <div className="mb-6 space-y-4">
+                {(messages.length > 0 || pendingUserMessage || showAiLoading) && <div className="mb-4 space-y-3">
                     {messages.map((msg) => {
                         const messageType = msg.message.type;
                         const isUser = messageType === 'human' || messageType === 'user';
@@ -297,7 +297,7 @@ const ChatArea = ({
           </ScrollArea>
 
           {/* Chat Input - Fixed at bottom */}
-          <div className="p-6 border-t border-border flex-shrink-0">
+          <div className="p-4 border-t border-border flex-shrink-0">
             <div className="max-w-[1000px] mx-auto">
               <div className="flex space-x-4">
                 <div className="flex-1 relative">

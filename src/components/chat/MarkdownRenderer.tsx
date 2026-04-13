@@ -78,7 +78,7 @@ const processMarkdownWithCitations = (
       const processedContent = processTextWithMarkdown(paragraphText.trim());
       
       paragraphs.push(
-        <p key={`${segmentIndex}-${paragraphIndex}`} className="mb-4 leading-relaxed">
+        <p key={`${segmentIndex}-${paragraphIndex}`} className="mb-2 leading-snug text-[13px]">
           {processedContent}
           {/* Add citation at the end of the paragraph if this is the last paragraph of the segment */}
           {paragraphIndex === paragraphTexts.length - 1 && citation && onCitationClick && (
