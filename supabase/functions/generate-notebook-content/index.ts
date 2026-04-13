@@ -99,10 +99,10 @@ serve(async (req) => {
     };
 
     if (filePath) {
-      // For file sources (PDF, audio) or URLs (website, YouTube)
+      // File-based sources (pdf, audio, file[docx/xlsx/csv]) — pass the storage path
       payload.filePath = filePath;
     } else {
-      // For text sources, we need to get the content from the database
+      // Text-only sources (copied text) — content is stored in DB, not Storage
       const { data: source } = await supabaseClient
         .from('sources')
         .select('content')

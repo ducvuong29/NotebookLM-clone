@@ -23,6 +23,39 @@ serve(async (req) => {
       )
     }
 
+    // ============ FILE TYPE VALIDATION (Layer 2 defense) ============
+    // Whitelist allowed extensions — matches frontend ALLOWED_MIME_TYPES in AddSourcesDialog
+    // Whitelist allowed extensions — must stay in sync with ALLOWED_EXTENSIONS in AddSourcesDialog.tsx
+    // DOCX is intentionally excluded: n8n's extractFromFile does not support the docx operation.
+    const ALLOWED_EXTENSIONS = new Set([
+      'pdf', 'txt', 'md',
+      'mp3', 'wav', 'm4a', 'ogg',
+      'xlsx', 'xls',
+      'csv',
+    ])
+
+
+    const fileExtension = filePath.split('.').pop()?.toLowerCase() ?? ''
+
+    if (!fileExtension || !ALLOWED_EXTENSIONS.has(fileExtension)) {
+      // Create supabase client minimally just to mark source as failed
+      const supabaseClientForFail = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      )
+      await supabaseClientForFail
+        .from('sources')
+        .update({ processing_status: 'failed' })
+        .eq('id', sourceId)
+
+      console.error(`Unsupported file extension: .${fileExtension} for sourceId: ${sourceId}`)
+      return new Response(
+        JSON.stringify({ error: `Unsupported file type: .${fileExtension}. Allowed: pdf, txt, md, mp3, wav, m4a, xlsx, xls, csv` }),
+        { status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
+      )
+    }
+    // ============ END FILE TYPE VALIDATION ============
+
     // Verify the user owns this source
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
