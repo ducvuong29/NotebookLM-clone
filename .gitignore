@@ -72,6 +72,7 @@ lint-result.json
 .agents/
 .claude/
 .serena/
+.github/
 _bmad/
 _bmad-output/
 design-artifacts/
@@ -83,3 +84,13 @@ skills-lock.json
 *.md
 !README.md
 !LICENSE
+
+# Security scan reports
+security-scan-report.json
+security_scan_results.*
+security-report.*
+security_report.*
+
+# Test utilities and data
+generate-test-files.cjs
+test-upload-files/
