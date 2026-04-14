@@ -12,10 +12,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -680,
-        340
+        -3712,
+        -480
       ],
-      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "id": "c7d95040-7f25-44cf-9559-ed5993c6156f",
       "name": "Webhook",
       "webhookId": "generate-flowchart",
       "credentials": {
@@ -32,10 +32,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -420,
-        340
+        -3440,
+        -480
       ],
-      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "id": "c99e054b-a902-4c6b-b56c-c751aee3131e",
       "name": "Validate Input"
     },
     {
@@ -48,19 +48,15 @@
               "message": "You are a document-to-flowchart converter. Analyze the provided text and extract the process flow as a Mermaid.js flowchart diagram.\n\nOutput ONLY valid JSON with this exact structure (no markdown, no code fences):\n{\n  \"title\": \"Tên quy trình (concise, Vietnamese if source is Vietnamese)\",\n  \"summary\": \"Tóm tắt 3-5 câu về quy trình chính trong tài liệu\",\n  \"mermaid_code\": \"flowchart TD\\n    A([Bắt đầu]) --> B[Bước 1]\\n    ...\"\n}\n\nMermaid syntax rules (STRICTLY FOLLOW):\n- ALWAYS start with `flowchart TD` (top-down direction)\n- Node shapes: ([...]) for start/end, [...] for process, {...} for decision, [/...\\] for I/O\n- Use Vietnamese labels when source text is in Vietnamese\n- Maximum 20 nodes per flowchart\n- Every flowchart MUST have exactly 1 start node and at least 1 end node\n- Decision nodes MUST have exactly 2 outgoing edges with labels: -->|Có| and -->|Không| (or equivalent)\n- Use sequential node IDs: A, B, C, D, etc.\n- Do NOT include any HTML tags, JavaScript, or event handlers in labels\n- Use --> for edges (NOT --->, ===>, or other variants)\n- Escape special characters in labels: use #quot; for quotes, #amp; for ampersand\n\nIf the document does NOT contain a clear process or workflow:\n- Return a minimal flowchart with one node\n- Set summary to explain why\n- Set title to \"Không phát hiện quy trình\""
             }
           ]
-        },
-        "options": {
-          "maxTokens": 4096,
-          "temperature": 0.3
         }
       },
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.6,
       "position": [
-        -140,
-        340
+        -3168,
+        -480
       ],
-      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "id": "55467582-cd45-4987-acc8-ec76a2e4bbb6",
       "name": "Generate Flowchart"
     },
     {
@@ -70,10 +66,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        140,
-        340
+        -2880,
+        -480
       ],
-      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "id": "6324c2f5-4b0c-45b7-9f5c-d8b1f54fef96",
       "name": "Parse AI Response"
     },
     {
@@ -83,10 +79,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        400,
-        340
+        -2624,
+        -480
       ],
-      "id": "a1b2c3d4-0005-4000-8000-000000000005",
+      "id": "41a998ec-e623-432b-8a41-1351433738a3",
       "name": "Validate Mermaid"
     },
     {
@@ -116,10 +112,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        660,
-        340
+        -2368,
+        -480
       ],
-      "id": "a1b2c3d4-0006-4000-8000-000000000006",
+      "id": "ed4ee131-f62b-4896-8fa8-7df503b7b014",
       "name": "Update Flowchart - Success",
       "credentials": {
         "supabaseApi": {
@@ -132,19 +128,20 @@
       "parameters": {
         "model": {
           "__rl": true,
-          "value": "gpt-4o-mini",
+          "value": "gpt-5.4-pro",
           "mode": "list",
-          "cachedResultName": "gpt-4o-mini"
+          "cachedResultName": "gpt-5.4-pro"
         },
+        "builtInTools": {},
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        -140,
-        560
+        -3168,
+        -256
       ],
-      "id": "a1b2c3d4-0014-4000-8000-000000000014",
+      "id": "28571453-50cc-44b3-9565-4e7ed359d42a",
       "name": "OpenAI Chat Model",
       "credentials": {
         "openAiApi": {
@@ -158,10 +155,10 @@
       "type": "n8n-nodes-base.errorTrigger",
       "typeVersion": 1,
       "position": [
-        -420,
-        680
+        -3440,
+        -128
       ],
-      "id": "a1b2c3d4-0007-4000-8000-000000000007",
+      "id": "062c4be1-7f8a-4d39-9129-9688a8e1e760",
       "name": "Error Trigger"
     },
     {
@@ -171,10 +168,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -140,
-        680
+        -3168,
+        -128
       ],
-      "id": "a1b2c3d4-0008-4000-8000-000000000008",
+      "id": "f2be8668-cf0a-4084-87bd-8ada66de5391",
       "name": "Extract Error Info"
     },
     {
@@ -203,10 +200,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        140,
-        680
+        -2880,
+        -128
       ],
-      "id": "a1b2c3d4-0009-4000-8000-000000000009",
+      "id": "ea1a5b99-3ca0-4b70-a860-c6ff974f69c5",
       "name": "Has Flowchart ID?"
     },
     {
@@ -236,10 +233,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        400,
-        640
+        -2624,
+        -176
       ],
-      "id": "a1b2c3d4-0010-4000-8000-000000000010",
+      "id": "25925fd9-4f38-417a-ab77-e27d58876025",
       "name": "Update Flowchart - Failed",
       "credentials": {
         "supabaseApi": {
@@ -258,27 +255,11 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -1020,
-        200
+        -4048,
+        -608
       ],
-      "id": "a1b2c3d4-0011-4000-8000-000000000011",
+      "id": "9cface7b-9d16-411f-91ff-95275365feb8",
       "name": "Sticky Note - Header"
-    },
-    {
-      "parameters": {
-        "content": "## 🛡️ ERROR HANDLER\nCatches ANY error from the main flow.\nExtracts flowchart_id → marks record as `failed`.\nGuards against null flowchart_id (IF node).",
-        "height": 180,
-        "width": 350,
-        "color": 3
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        -560,
-        600
-      ],
-      "id": "a1b2c3d4-0012-4000-8000-000000000012",
-      "name": "Sticky Note - Error Handler"
     },
     {
       "parameters": {
@@ -290,10 +271,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        320,
-        140
+        -2704,
+        -672
       ],
-      "id": "a1b2c3d4-0013-4000-8000-000000000013",
+      "id": "e1136a96-9865-4e82-a881-92d19356ec35",
       "name": "Sticky Note - Security"
     }
   ],
@@ -384,8 +365,7 @@
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     },
     "OpenAI Chat Model": {
@@ -400,24 +380,21 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
-    "saveExecutionProgress": true,
-    "executionTimeout": 120,
-    "errorWorkflow": "",
-    "timeSavedMode": "fixed",
-    "callerPolicy": "workflowsFromSameOwner",
-    "availableInMCP": false
+    "binaryMode": "separate"
   },
-  "versionId": "00000000-0000-4000-8000-000000000001",
+  "versionId": "aa52caf7-e606-4b3c-b10e-98483bfcb123",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "8aa65990611bf8c8eff44388d5865e91c835317eab848ea9b81a93b6e1a15d69"
   },
-  "id": "",
+  "id": "Q2UxdzZwLVayAxj0",
   "tags": [
     {
+      "updatedAt": "2026-03-18T17:37:57.362Z",
+      "createdAt": "2026-03-18T17:37:57.362Z",
       "id": "JoQexUOz3iYBucBb",
       "name": "TheAIAutomators.com"
     }

@@ -8,10 +8,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2544,
-        6080
+        -5376,
+        7392
       ],
-      "id": "9721b28e-9fd1-45be-b73a-90e41a66bb92",
+      "id": "c83b77ae-9c5e-443d-85c6-a334d4518d7e",
       "name": "Check is FFMPEG Installed"
     },
     {
@@ -41,10 +41,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -2320,
-        6080
+        -5152,
+        7392
       ],
-      "id": "8d18a08f-1b79-42a3-a240-2a3fa0f3be8e",
+      "id": "cd06465e-1ed8-43b7-a3e8-0a01e311080d",
       "name": "If"
     },
     {
@@ -58,10 +58,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
       "position": [
-        -2016,
-        5968
+        -4848,
+        7280
       ],
-      "id": "2d6a44c9-b29d-41e8-b334-4fd56d94b0df",
+      "id": "d04f4837-676b-49a2-a4a4-1c1cdac0c721",
       "name": "Respond to Webhook"
     },
     {
@@ -75,10 +75,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
       "position": [
-        -2016,
-        6144
+        -4848,
+        7456
       ],
-      "id": "2fa0b331-26da-4142-909f-5f3964476a43",
+      "id": "eddec172-7070-40a1-86e7-14249d530ab2",
       "name": "Respond with 500 Error"
     },
     {
@@ -90,10 +90,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -80,
-        5600
+        -2912,
+        6912
       ],
-      "id": "0857ccc8-eaee-4980-a7d4-cd272b9330af",
+      "id": "67f86113-9b80-40d8-a6f8-f7ee0545c47b",
       "name": "Sticky Note1"
     },
     {
@@ -107,10 +107,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -2800,
-        6080
+        -5632,
+        7392
       ],
-      "id": "8e9c6ae3-457d-459c-a8b4-3a82a39365ef",
+      "id": "a645dafe-b20e-46f0-b7cb-22bb215adb30",
       "name": "Webhook",
       "webhookId": "4c4699bc-004b-4ca3-8923-373ddd4a274e",
       "credentials": {
@@ -138,10 +138,10 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        -1760,
-        5968
+        -4592,
+        7280
       ],
-      "id": "8315b236-f021-4b27-b405-4a9b8d2c8e58",
+      "id": "5525a69e-ea17-4e21-a2a6-17ec1e7b8f4a",
       "name": "Get Sources",
       "credentials": {
         "supabaseApi": {
@@ -160,10 +160,10 @@
       "type": "n8n-nodes-base.aggregate",
       "typeVersion": 1,
       "position": [
-        -1536,
-        5968
+        -4368,
+        7280
       ],
-      "id": "87358527-e9b0-430d-b98a-7bbab4846b8b",
+      "id": "e924a0dc-4459-4e63-ac91-0bbcef934097",
       "name": "Aggregate"
     },
     {
@@ -183,10 +183,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -1280,
-        5968
+        -4112,
+        7280
       ],
-      "id": "f00f78cd-dc5d-4997-9ea1-d47921a78e9e",
+      "id": "f17386eb-c7f8-41ab-9a58-06940a59e353",
       "name": "Set Prompt"
     },
     {
@@ -198,10 +198,10 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.7,
       "position": [
-        -1024,
-        5952
+        -3856,
+        7264
       ],
-      "id": "f8d6b839-fb9c-466d-9e48-f2e12587b901",
+      "id": "62f21e2e-6ae4-4668-8645-e467503e9c46",
       "name": "Basic LLM Chain",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -227,10 +227,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -608,
-        5952
+        -3440,
+        7264
       ],
-      "id": "90aa70d9-33b4-42f9-b4ee-67b149bcc434",
+      "id": "4b41cbff-6984-4a6e-b93f-8e03c38a1b31",
       "name": "Generate Audio",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -267,13 +267,13 @@
           }
         }
       },
-      "id": "4cdaeab5-ceda-47e9-b5a0-c619d5ad52ff",
+      "id": "6d191ae0-034d-4b25-b8ea-e841e197dd9f",
       "name": "Upload object",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        -208,
-        5952
+        -3040,
+        7264
       ],
       "credentials": {
         "supabaseApi": {
@@ -296,10 +296,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        96,
-        5952
+        -2736,
+        7264
       ],
-      "id": "eeab5088-c095-4bb3-88a4-d3c36e7e8b09",
+      "id": "8cc60f72-c7ee-4401-80ce-bdf0970adb41",
       "name": "Generate Signed URL",
       "credentials": {
         "supabaseApi": {
@@ -315,10 +315,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        384,
-        5952
+        -2448,
+        7264
       ],
-      "id": "a8ff1f24-5563-499f-a479-4934e1d0d568",
+      "id": "cca5ee1d-abe7-496f-b280-e0372f739fc7",
       "name": "Generate Timestamp for Expires"
     },
     {
@@ -354,10 +354,10 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        672,
-        5952
+        -2160,
+        7264
       ],
-      "id": "55f58e44-978f-4772-98da-ec9c89e9ef1f",
+      "id": "5bf86da2-1a4a-45b4-a210-12718e007557",
       "name": "Supabase",
       "credentials": {
         "supabaseApi": {
@@ -376,19 +376,19 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -2800,
-        5664
+        -5632,
+        6976
       ],
-      "id": "b69284f1-6707-416f-956b-6fea88442916",
+      "id": "2cf217f9-3e2d-4c9b-aa67-ca78dd91a3df",
       "name": "Sticky Note8"
     },
     {
       "parameters": {
         "model": {
           "__rl": true,
-          "value": "gpt-4o-mini",
+          "value": "gpt-5.4-pro",
           "mode": "list",
-          "cachedResultName": "gpt-4o-mini"
+          "cachedResultName": "gpt-5.4-pro"
         },
         "builtInTools": {},
         "options": {}
@@ -396,10 +396,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        -928,
-        6160
+        -3760,
+        7472
       ],
-      "id": "1adb58ec-2819-41c1-b73c-7a3fe28ca489",
+      "id": "358ecf4d-10f4-4f83-829d-d57c341f15be",
       "name": "OpenAI Chat Model",
       "credentials": {
         "openAiApi": {
@@ -567,7 +567,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "a572cbe1-9dfb-42ed-a03c-200aadfe9883",
+  "versionId": "302e521c-97f6-490c-9570-42d0f91294a0",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "8aa65990611bf8c8eff44388d5865e91c835317eab848ea9b81a93b6e1a15d69"

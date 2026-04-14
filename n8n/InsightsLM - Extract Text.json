@@ -14,10 +14,10 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        1632,
-        2048
+        -320,
+        96
       ],
-      "id": "cf0b1aa8-82ad-472c-862c-de6ec0345016",
+      "id": "ec3dafbc-fbe7-41ad-b367-c8ef328b9dfc",
       "name": "When Executed by Another Workflow"
     },
     {
@@ -34,10 +34,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1856,
-        2048
+        -96,
+        96
       ],
-      "id": "e307a666-728e-4093-8fd7-bee2b21258c2",
+      "id": "1f075fe5-7dd6-470e-81ef-6e9581d8fa33",
       "name": "Generate Signed URL",
       "credentials": {
         "supabaseApi": {
@@ -52,8 +52,7 @@
         "options": {
           "response": {
             "response": {
-              "responseFormat": "file",
-              "outputPropertyName": "data"
+              "responseFormat": "file"
             }
           }
         }
@@ -61,10 +60,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2080,
-        2048
+        128,
+        96
       ],
-      "id": "0672e60b-78dd-4b48-b09c-91ba555b89c7",
+      "id": "7ba08376-3226-492a-9fbe-f86d62633139",
       "name": "Download File"
     },
     {
@@ -74,7 +73,7 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": false,
+                  "caseSensitive": true,
                   "leftValue": "",
                   "typeValidation": "strict",
                   "version": 2
@@ -97,7 +96,7 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": false,
+                  "caseSensitive": true,
                   "leftValue": "",
                   "typeValidation": "strict",
                   "version": 2
@@ -160,7 +159,7 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": false,
+                  "caseSensitive": true,
                   "leftValue": "",
                   "typeValidation": "strict",
                   "version": 2
@@ -183,7 +182,7 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": false,
+                  "caseSensitive": true,
                   "leftValue": "",
                   "typeValidation": "strict",
                   "version": 2
@@ -216,7 +215,7 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": false,
+                  "caseSensitive": true,
                   "leftValue": "",
                   "typeValidation": "strict",
                   "version": 2
@@ -243,10 +242,10 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        2304,
-        2048
+        352,
+        96
       ],
-      "id": "901ceeab-2424-4fd7-b4aa-ef95f4558d23",
+      "id": "03f1dd0d-22cc-424f-ac75-843219101ac8",
       "name": "Switch"
     },
     {
@@ -257,10 +256,10 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
       "position": [
-        2512,
-        1856
+        560,
+        -96
       ],
-      "id": "75c01b24-38cf-4083-bc83-e3d79d16d40c",
+      "id": "0737b46e-fcbb-456d-9e36-88a14adcffbf",
       "name": "Extract from File"
     },
     {
@@ -270,10 +269,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2512,
-        2256
+        560,
+        304
       ],
-      "id": "fa124e69-363e-41a5-b18d-f643252405f8",
+      "id": "b8a97ab4-be7f-4eac-9e6b-71414e341d21",
       "name": "Edit Fields1"
     },
     {
@@ -293,10 +292,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        2736,
-        2048
+        784,
+        96
       ],
-      "id": "237d861b-8183-4550-9d8c-147b617a62c7",
+      "id": "bc93bc73-4705-42b6-a510-3bc631b0c465",
       "name": "Extracted Text"
     },
     {
@@ -309,10 +308,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1632,
-        1664
+        -320,
+        -288
       ],
-      "id": "381e201d-b6fb-49ca-be4b-ac48126e3601",
+      "id": "704849da-00e3-4206-80f1-c45f8a747d07",
       "name": "Sticky Note8"
     },
     {
@@ -324,10 +323,10 @@
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 2.1,
       "position": [
-        2528,
-        2048
+        576,
+        96
       ],
-      "id": "3f4bb816-f4bd-4178-910b-4838867f8a6d",
+      "id": "b5da192b-16b2-4e36-a104-b537f87c55ad",
       "name": "Transcribe a recording1",
       "credentials": {
         "openAiApi": {
@@ -344,10 +343,10 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
       "position": [
-        2512,
-        2640
+        560,
+        688
       ],
-      "id": "b2c3d4e5-bbbb-cccc-dddd-eeeeffff0000",
+      "id": "56302497-7d21-47b8-b9a6-65c8a24e5970",
       "name": "Extract from Excel"
     },
     {
@@ -357,24 +356,23 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2736,
-        2640
+        784,
+        688
       ],
-      "id": "excel-convert-9999-aaaa-bbbb-ccccdddd0001",
+      "id": "8e521a1f-2749-4fc2-a352-012c4245e258",
       "name": "Convert Excel to Text"
     },
     {
       "parameters": {
-        "operation": "csv",
         "options": {}
       },
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1,
       "position": [
-        2512,
-        2832
+        560,
+        880
       ],
-      "id": "c3d4e5f6-cccc-dddd-eeee-ffff00001111",
+      "id": "bb6ad623-a820-4291-b0b9-2c781013256b",
       "name": "Extract from CSV"
     },
     {
@@ -384,10 +382,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2736,
-        2832
+        784,
+        880
       ],
-      "id": "csv-convert-9999-aaaa-bbbb-ccccdddd0002",
+      "id": "300bd4b8-d3fe-4e8f-b67b-cbe441d950a1",
       "name": "Convert CSV to Text"
     }
   ],
@@ -548,7 +546,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "8a890e77-ae5a-4d37-adfb-fb8b57805370",
+  "versionId": "9df1a49d-e087-484f-9be5-0cd97ed09513",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "8aa65990611bf8c8eff44388d5865e91c835317eab848ea9b81a93b6e1a15d69"
